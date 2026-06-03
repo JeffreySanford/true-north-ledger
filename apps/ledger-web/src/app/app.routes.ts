@@ -1,15 +1,31 @@
 import { Route } from '@angular/router';
-import { DashboardPage } from './dashboard.page';
-import { LedgerEventsPage } from './ledger-events.page';
-import { DevicesPage } from './devices.page';
-import { ProofsPage } from './proofs.page';
-import { SettingsPage } from './settings.page';
 
 export const appRoutes: Route[] = [
-  { path: '', component: DashboardPage },
-  { path: 'ledger-events', component: LedgerEventsPage },
-  { path: 'devices', component: DevicesPage },
-  { path: 'proofs', component: ProofsPage },
-  { path: 'settings', component: SettingsPage },
+  {
+    path: '',
+    pathMatch: 'full',
+    loadChildren: () => import('./pages/dashboard/dashboard.module').then((m) => m.DashboardModule),
+  },
+  {
+    path: 'dashboard',
+    pathMatch: 'full',
+    loadChildren: () => import('./pages/dashboard/dashboard.module').then((m) => m.DashboardModule),
+  },
+  {
+    path: 'ledger-events',
+    loadChildren: () => import('./pages/ledger-events/ledger-events.module').then((m) => m.LedgerEventsModule),
+  },
+  {
+    path: 'devices',
+    loadChildren: () => import('./pages/devices/devices.module').then((m) => m.DevicesModule),
+  },
+  {
+    path: 'proofs',
+    loadChildren: () => import('./pages/proofs/proofs.module').then((m) => m.ProofsModule),
+  },
+  {
+    path: 'settings',
+    loadChildren: () => import('./pages/settings/settings.module').then((m) => m.SettingsModule),
+  },
   { path: '**', redirectTo: '' },
 ];

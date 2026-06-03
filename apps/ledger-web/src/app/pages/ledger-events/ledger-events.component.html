@@ -1,0 +1,38 @@
+<section class="section-card">
+  <h1 class="page-heading">Ledger Events</h1>
+  <div class="page-actions">
+    <button class="button-primary" (click)="refresh()">Refresh events</button>
+    <button class="button-secondary" (click)="createDemo()">Create demo event</button>
+  </div>
+
+  @if (error) {
+    <div class="section-card" data-testid="ledger-events-error">
+      <strong>Error:</strong> {{ error }}
+    </div>
+  }
+
+  @if (loading) {
+    <div class="section-card">
+      Loading ledger events...
+    </div>
+  }
+
+  @if (!loading && events.length > 0) {
+    <ul class="event-list" data-testid="ledger-events-list">
+      @for (event of events; track event.id) {
+        <li data-testid="ledger-event-row">
+          <strong>{{ event.type }}</strong> — {{ event.subjectType }} / {{ event.subjectId }}<br />
+          <small>Actor: {{ event.actorType }} / {{ event.actorId }}</small>
+        </li>
+      }
+    </ul>
+  }
+
+  <div
+    class="section-card"
+    data-testid="ledger-events-empty"
+    [style.display]="loading || events.length > 0 ? 'none' : 'block'"
+  >
+    No ledger events recorded yet. Use the button above to create a demo event.
+  </div>
+</section>

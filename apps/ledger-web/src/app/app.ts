@@ -5,7 +5,7 @@ import { RouterModule } from '@angular/router';
   selector: 'tnl-root',
   imports: [RouterModule],
   templateUrl: './app.html',
-  styleUrl: './app.scss',
+  styleUrls: ['./app.scss'],
 })
 export class App {
   protected title = 'ledger-web';

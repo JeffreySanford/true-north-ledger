@@ -1,24 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
 import { App } from './app';
-import { DashboardPage } from './dashboard.page';
-import { LedgerEventsPage } from './ledger-events.page';
-import { DevicesPage } from './devices.page';
-import { ProofsPage } from './proofs.page';
-import { SettingsPage } from './settings.page';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [
-        RouterModule.forRoot([]),
-        App,
-        DashboardPage,
-        LedgerEventsPage,
-        DevicesPage,
-        ProofsPage,
-        SettingsPage,
-      ],
+      imports: [RouterModule.forRoot([]), App],
     }).compileComponents();
   });
 

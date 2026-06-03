@@ -6,7 +6,8 @@
 
 All TypeScript configurations must use modern module resolution strategies:
 
-- **Libraries**: Use `moduleResolution: "bundler"` in `tsconfig.base.json`
+- **Frontend applications**: Use `moduleResolution: "bundler"` in app-specific tsconfig files for Angular applications
+- **Libraries**: Keep `moduleResolution: "node"` in shared/base configs when library targets require CommonJS or legacy module resolution
 - **Node.js Backend (NestJS)**: Use `moduleResolution: "nodenext"` in backend-specific configs
 - **Never use deprecated options**: Avoid `moduleResolution: "node"` or `"node10"` which are deprecated as of TypeScript 5.0+
 
@@ -220,6 +221,19 @@ it('should return data stream', (done) => {
   });
 });
 ```
+
+#### Angular Component and Module Structure
+
+- Feature pages and UI components must be organized as folder-scoped NgModules, not standalone page components.
+- Each page feature should have its own folder with:
+  - `*.component.ts`
+  - `*.component.html`
+  - `*.component.scss`
+  - `*.module.ts`
+- Use `templateUrl` and `styleUrls` instead of inline `template` and `styles`.
+- Keep page templates and styles in external files so the UI can be reviewed and styled independently of component logic.
+- Prefer route-level lazy-loaded feature modules for pages instead of importing standalone components directly into route definitions.
+- Root shell components may still bootstrap the application, but page-level routing should resolve through NgModules.
 
 ## Angular Styling and MD3 Foundation
 

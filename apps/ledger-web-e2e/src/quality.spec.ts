@@ -217,12 +217,12 @@ test.describe('ledger-web quality gates', () => {
 
   test('empty state shows helpful message', async ({ page }) => {
     await page.goto('/ledger-events');
+    await expect(page.locator('h1')).toHaveText('Ledger Events');
     
     const emptyMessage = page.locator('[data-testid="ledger-events-empty"]');
     // May or may not be visible depending on if events exist from other tests
     // This is acceptable - just verifying the element exists in the DOM
-    const emptyExists = await emptyMessage.count() > 0;
-    expect(emptyExists).toBe(true);
+    await expect(emptyMessage).toHaveCount(1);
   });
 
   test.describe('Error Scenarios', () => {
@@ -296,8 +296,11 @@ test.describe('ledger-web quality gates', () => {
 
     test('validates browser back/forward navigation', async ({ page }) => {
       await page.goto('/');
+      await expect(page.locator('h1')).toHaveText('Dashboard');
       await page.goto('/ledger-events');
+      await expect(page.locator('h1')).toHaveText('Ledger Events');
       await page.goto('/devices');
+      await expect(page.locator('h1')).toHaveText('Devices');
       
       // Navigate back
       await page.goBack();
