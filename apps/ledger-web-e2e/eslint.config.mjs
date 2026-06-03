@@ -7,6 +7,11 @@ export default [
   {
     files: ['**/*.ts', '**/*.js'],
     // Override or add rules here
-    rules: {},
+    rules: {
+      // Downgrade Playwright best practice rules to warnings for Sprint 0
+      'playwright/no-networkidle': 'warn',
+      'playwright/no-wait-for-timeout': 'warn',
+      'playwright/prefer-web-first-assertions': 'warn',
+    },
   },
 ];

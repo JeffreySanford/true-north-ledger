@@ -219,7 +219,8 @@ test.describe('ledger-web quality gates', () => {
       
       // Simulate network timeout
       await page.route('**/api/v1/ledger/events', route => {
-        return new Promise(() => {}); // Never resolves
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        return new Promise(() => {}); // Never resolves - intentional timeout simulation
       });
       
       const createButton = page.locator('button', { hasText: 'Create demo event' });

@@ -76,8 +76,8 @@ export class LedgerEventsService {
       entity.timestamp = new Date(dto.metadata.timestamp);
 
       if (dto.type === 'DEVICE_LEDGER_EVENT') {
-        entity.deviceId = (dto as any).deviceId ?? '';
-        entity.deviceType = (dto as any).deviceType ?? '';
+        entity.deviceId = dto.deviceId;
+        entity.deviceType = dto.deviceType;
       }
 
       return from(this.ledgerEventRepository.save(entity)).pipe(

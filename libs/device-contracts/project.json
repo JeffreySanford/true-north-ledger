@@ -5,5 +5,18 @@
   "projectType": "library",
   "tags": ["type:lib", "scope:device"],
   "// targets": "to see all targets run: nx show project device-contracts --web",
-  "targets": {}
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/device-contracts",
+        "main": "libs/device-contracts/src/index.ts",
+        "tsConfig": "libs/device-contracts/tsconfig.lib.json",
+        "assets": ["libs/device-contracts/*.md"],
+        "format": ["cjs"],
+        "generatePackageJson": true
+      }
+    }
+  }
 }

@@ -5,5 +5,18 @@
   "projectType": "library",
   "tags": ["type:lib", "scope:auth"],
   "// targets": "to see all targets run: nx show project auth-contracts --web",
-  "targets": {}
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/auth-contracts",
+        "main": "libs/auth-contracts/src/index.ts",
+        "tsConfig": "libs/auth-contracts/tsconfig.lib.json",
+        "assets": ["libs/auth-contracts/*.md"],
+        "format": ["cjs"],
+        "generatePackageJson": true
+      }
+    }
+  }
 }

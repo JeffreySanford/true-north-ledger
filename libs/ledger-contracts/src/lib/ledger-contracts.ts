@@ -65,15 +65,33 @@ export const LedgerEventResponseSchema = z.discriminatedUnion('type', [
 ]);
 export type LedgerEventResponse = z.infer<typeof LedgerEventResponseSchema>;
 
-export const AppendLedgerEventDtoSchema = z.object({
-  type: z.enum(['LEDGER_EVENT', 'DEVICE_LEDGER_EVENT']),
+// Base DTO for all ledger events
+const baseLedgerEventDto = {
   actorType: ActorTypeSchema,
   actorId: z.string(),
   subjectType: z.string(),
   subjectId: z.string(),
   payload: z.record(z.string(), z.any()),
   metadata: AuditMetadataSchema,
-  deviceId: z.string().optional(),
-  deviceType: z.string().optional(),
+};
+
+// DTO for standard ledger events
+const StandardLedgerEventDtoSchema = z.object({
+  ...baseLedgerEventDto,
+  type: z.literal('LEDGER_EVENT'),
 });
+
+// DTO for device ledger events (requires deviceId and deviceType)
+const DeviceLedgerEventDtoSchema = z.object({
+  ...baseLedgerEventDto,
+  type: z.literal('DEVICE_LEDGER_EVENT'),
+  deviceId: z.string().min(1, 'deviceId is required for DEVICE_LEDGER_EVENT'),
+  deviceType: z.string().min(1, 'deviceType is required for DEVICE_LEDGER_EVENT'),
+});
+
+// Discriminated union for append DTO
+export const AppendLedgerEventDtoSchema = z.discriminatedUnion('type', [
+  StandardLedgerEventDtoSchema,
+  DeviceLedgerEventDtoSchema,
+]);
 export type AppendLedgerEventDto = z.infer<typeof AppendLedgerEventDtoSchema>;

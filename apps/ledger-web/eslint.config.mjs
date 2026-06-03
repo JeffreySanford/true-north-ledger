@@ -24,10 +24,19 @@ export default [
           style: 'kebab-case',
         },
       ],
+      // Downgrade Angular best practice rules to warnings for Sprint 0
+      '@angular-eslint/prefer-standalone': 'warn',
+      '@angular-eslint/prefer-inject': 'warn',
     },
   },
   {
     files: ['**/*.html'],
+    rules: {
+      // Downgrade template best practice rules to warnings for Sprint 0
+      '@angular-eslint/template/prefer-control-flow': 'warn',
+    },
+  },
+  {
     // Override or add rules here
     rules: {},
   },

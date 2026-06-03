@@ -1,7 +1,14 @@
-import baseConfig from '../eslint.config.mjs';
+import baseConfig from '../../eslint.config.mjs';
 
 export default [
   ...baseConfig,
+  {
+    files: ['**/*.ts'],
+    rules: {
+      // shared-models is a re-export library, allow importing from contract libraries
+      '@nx/enforce-module-boundaries': 'warn',
+    },
+  },
   {
     files: ['**/*.json'],
     rules: {

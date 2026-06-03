@@ -5,12 +5,12 @@
   "scripts": {
     "start:api": "nx run ledger-api:serve",
     "start:web": "nx run ledger-web:serve --configuration=development",
-    "start:full": "bash -lc \"pnpm start:api & pnpm start:web\"",
+    "start:full": "concurrently \"pnpm start:api\" \"pnpm start:web\"",
     "test:e2e": "nx e2e ledger-web-e2e",
     "docker:up": "docker-compose -f apps/docker/docker-compose.yml up -d",
     "docker:down": "docker-compose -f apps/docker/docker-compose.yml down",
     "docker:logs": "docker-compose -f apps/docker/docker-compose.yml logs -f",
-    "start:all": "pnpm docker:up && sleep 3 && pnpm start:full"
+    "start:all": "pnpm docker:up && pnpm start:full"
   },
   "private": true,
   "devDependencies": {
@@ -46,6 +46,7 @@
     "@types/supertest": "^7.2.0",
     "@typescript-eslint/utils": "^8.40.0",
     "angular-eslint": "^21.2.0",
+    "concurrently": "^10.0.3",
     "esbuild": "^0.27.0",
     "eslint": "^9.8.0",
     "eslint-config-prettier": "^10.0.0",

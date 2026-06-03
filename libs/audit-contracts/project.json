@@ -5,5 +5,18 @@
   "projectType": "library",
   "tags": ["type:lib", "scope:audit"],
   "// targets": "to see all targets run: nx show project audit-contracts --web",
-  "targets": {}
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/audit-contracts",
+        "main": "libs/audit-contracts/src/index.ts",
+        "tsConfig": "libs/audit-contracts/tsconfig.lib.json",
+        "assets": ["libs/audit-contracts/*.md"],
+        "format": ["cjs"],
+        "generatePackageJson": true
+      }
+    }
+  }
 }
