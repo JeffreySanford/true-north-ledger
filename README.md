@@ -8,7 +8,7 @@ The product goal is simple: every actor has an identity, and every meaningful ac
 
 This repository is an Nx workspace using pnpm.
 
-**Current Status:** Foundation Phase Complete (Post-Postgres Migration)
+**Current Status:** Early Foundation - Critical Security & Quality Issues Identified
 
 Implemented now:
 
@@ -22,10 +22,18 @@ Implemented now:
 - `libs/audit-contracts` - Audit metadata schemas
 - Docker Compose infrastructure (PostgreSQL, Redis, PgAdmin)
 
-**Test Coverage:**
-- Backend: 100% statements, 100% functions, 80.5% branches, 31 tests (22 unit + 9 integration)
-- Frontend: 3 tests with Observable patterns
-- E2E: 14 Playwright quality gates
+**Test Status:**
+- Backend: 42 tests (1 failing: deviceId validation)
+- Frontend: 3 tests passing
+- E2E: Not currently passing (timeout issues)
+- Lint: Failing across multiple projects
+
+**Known Critical Issues:**
+1. ❌ Ledger API has NO authentication/authorization
+2. ❌ Audit chain not implemented (no event_hash, previous_hash)
+3. ❌ Client controls audit metadata (should be server-side)
+4. ❌ Contract schemas too permissive
+5. ❌ Error handling returns 500s instead of proper HTTP codes
 
 **Architecture:**
 - Schema-driven contracts with Zod validation across frontend and API
