@@ -1,0 +1,82 @@
+# Architecture
+
+True North Ledger uses an Nx monorepo so applications, shared contracts, and infrastructure can evolve together.
+
+## Current Repo State
+
+```mermaid
+flowchart TD
+  repo[true-north-ledger]
+  apps[apps]
+  web[ledger-web]
+  e2e[ledger-web-e2e]
+  nx[Nx workspace config]
+
+  repo --> apps
+  repo --> nx
+  apps --> web
+  apps --> e2e
+```
+
+## Target Platform
+
+```mermaid
+flowchart LR
+  subgraph Clients
+    web[Web Dashboard]
+    tablet[Tablet Workbench]
+    mobile[Mobile Actions]
+    proof[Public Proof Pages]
+    partner[Partner API]
+    device[Devices]
+  end
+
+  subgraph Backend
+    api[NestJS Ledger API]
+    auth[Auth and Permissions]
+    writer[Ledger Event Writer]
+    notify[WebSocket Notifications]
+  end
+
+  subgraph Data
+    pg[(Postgres)]
+    redis[(Redis)]
+  end
+
+  Clients --> api
+  api --> auth
+  auth --> writer
+  writer --> pg
+  writer --> notify
+  api --> redis
+```
+
+## Request Flow
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant API
+  participant Guard as Auth Guard
+  participant Service
+  participant Ledger as Ledger Writer
+  participant DB as Postgres
+  participant WS as WebSocket
+
+  Client->>API: Write request
+  API->>Guard: Verify actor and permission
+  Guard-->>API: Allowed
+  API->>Service: Execute use case
+  Service->>Ledger: Record ledger event
+  Ledger->>DB: Transaction and hash update
+  Ledger->>WS: Emit notification
+  API-->>Client: Result
+```
+
+## Design Rules
+
+- REST is the first write path.
+- WebSockets provide live updates after durable writes.
+- MQTT is deferred until device volume or protocol requirements justify it.
+- Ledger events are append-only.
+- Feature libraries should expose contracts and behavior, not duplicate domain types.
