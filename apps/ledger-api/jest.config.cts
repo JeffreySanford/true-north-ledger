@@ -2,6 +2,7 @@ module.exports = {
   displayName: 'ledger-api',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/src/test-env.ts'],
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },

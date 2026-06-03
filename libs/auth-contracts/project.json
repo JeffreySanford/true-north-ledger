@@ -14,8 +14,7 @@
         "main": "libs/auth-contracts/src/index.ts",
         "tsConfig": "libs/auth-contracts/tsconfig.lib.json",
         "assets": ["libs/auth-contracts/*.md"],
-        "format": ["cjs"],
-        "generatePackageJson": true
+        "format": ["cjs"]
       }
     }
   }

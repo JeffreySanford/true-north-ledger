@@ -1,15 +1,18 @@
 # Sprint 1: Authentication & Authorization Foundation
 
 **Sprint Duration:** 2 weeks (June 3 - June 16, 2026)  
-**Sprint Goal:** Implement secure multi-actor authentication with scoped permissions and audit events.
+**Sprint Goal:** Turn the Sprint 0 auth guard foundation into a product RBAC system with users, roles, permissions, session UX, and role-specific web/tablet/mobile route gating.
 
 ---
 
 ## Sprint Acceptance Criteria
 
-- [ ] JWT-based authentication working for USER actors
+- [ ] JWT-based authentication working for `user` actors
+- [ ] RBAC roles seeded for admin, operations manager, inventory, shipping, billing, moderator, auditor, device technician, support, and viewer
+- [ ] User-role assignment and route permission metadata implemented
 - [ ] Service token authentication implemented
 - [ ] Permission guard system operational across all endpoints
+- [ ] Web, tablet, and mobile navigation only expose routes allowed by the user permissions
 - [ ] Auth-related ledger events captured (login, logout, permission denied)
 - [ ] Rate limiting active on all public endpoints
 - [ ] Integration tests validate auth flows and permission enforcement
@@ -21,15 +24,18 @@
 ### Backend Authentication Module
 
 #### Auth Module Setup
-- [ ] Generate `auth` module using NestJS CLI (`nest g module auth`)
-- [ ] Generate `auth` controller (`nest g controller auth`)
-- [ ] Generate `auth` service (`nest g service auth`)
-- [ ] Install dependencies: `@nestjs/jwt`, `@nestjs/passport`, `passport`, `passport-jwt`, `passport-local`
-- [ ] Install types: `@types/passport-jwt`, `@types/passport-local`
+- [ ] Extend existing `auth` module created during Sprint 0
+- [ ] Add `auth` controller for login/logout/refresh endpoints
+- [ ] Add `auth` service for credential validation and token lifecycle
+- [ ] Add `users` module for user records, status, and tenant membership
+- [ ] Add `roles` module for RBAC role and permission assignment
+- [ ] Install remaining dependency if local username/password strategy is used: `passport-local`
+- [ ] Install remaining type if local username/password strategy is used: `@types/passport-local`
 
 #### JWT Authentication Strategy
 - [ ] Create `JwtStrategy` class extending `PassportStrategy`
 - [ ] Configure JWT secret from environment variables
+- [ ] Fail startup when required auth secrets are missing
 - [ ] Implement JWT payload validation
 - [ ] Extract user/actor information from JWT
 - [ ] Add tenant_id to JWT payload
@@ -44,6 +50,7 @@
 - [ ] Add service token to database schema (service_tokens table)
 - [ ] Create ServiceToken entity with TypeORM
 - [ ] Add token hashing (bcrypt or SHA-256)
+- [ ] Store raw service tokens only once at creation; persist hashed token values only
 - [ ] Implement token revocation check
 - [ ] Create `ServiceAuthGuard` extending `AuthGuard('service')`
 - [ ] Test service token authentication
@@ -75,10 +82,11 @@
   - [ ] Create SERVICE_TOKEN_REVOKED event
 
 #### Permissions Guard System
-- [ ] Create `PermissionsGuard` implementing `CanActivate`
-- [ ] Create `@RequirePermissions()` decorator
-- [ ] Implement permission check logic
+- [ ] Extend existing `PermissionsGuard` from Sprint 0 to use granular permission names
+- [ ] Extend existing `@RequirePermissions()` decorator to support route metadata consistently
+- [ ] Implement RBAC permission check logic
   - [ ] Extract actor permissions from request
+  - [ ] Resolve user roles to permission grants
   - [ ] Compare with required permissions
   - [ ] Allow if actor has all required permissions
 - [ ] Create PERMISSION_DENIED ledger event on failure
@@ -118,7 +126,18 @@
 - [ ] Test cross-tenant access prevention
 - [ ] Create TENANT_ISOLATION_VIOLATION event for violations
 
-#### Unit Tests (Target: 100% Coverage)
+#### RBAC Roles and Permissions
+- [ ] Implement default roles from `documentation/platform/rbac-and-views.md`
+- [ ] Implement permission catalog using dot-case names such as `ledger.read`, `orders.status.write`, and `devices.manage`
+- [ ] Seed default role-permission mappings per tenant
+- [ ] Add admin-only role assignment endpoint
+- [ ] Add user deactivation endpoint
+- [ ] Add role assignment audit events
+- [ ] Test admin can assign roles
+- [ ] Test non-admin cannot assign roles
+- [ ] Test multiple roles merge permissions correctly
+
+#### Unit Tests (Behavior Coverage)
 - [ ] Auth service tests
   - [ ] Test login with valid credentials
   - [ ] Test login with invalid credentials
@@ -152,6 +171,7 @@
   - [ ] Request without JWT returns 401
   - [ ] Request with expired JWT returns 401
   - [ ] Request with invalid JWT returns 401
+  - [ ] Browser-to-API-to-database-to-UI JWT path remains covered by full-stack E2E
 - [ ] Permissions integration test
   - [ ] Request with required permissions succeeds
   - [ ] Request without required permissions returns 403
@@ -178,16 +198,18 @@
 
 #### Auth Contracts Extension
 - [ ] Create JWT payload schema (user_id, actor_type, tenant_id, permissions, exp, iat)
+- [ ] Add role schema and role assignment schema
 - [ ] Add login request schema (username, password)
 - [ ] Add login response schema (access_token, refresh_token, user_info)
 - [ ] Create service token schema (name, permissions, scopes)
-- [ ] Add permission enum values (LEDGER_READ, LEDGER_WRITE, ADMIN, etc.)
-- [ ] Create actor type enum (USER, SERVICE, DEVICE, SYSTEM)
+- [ ] Add permission enum values from `documentation/platform/rbac-and-views.md`
+- [ ] Create actor type enum (`user`, `service`, `device`, `system`)
 - [ ] Add validation for permission combinations
 - [ ] Export all schemas from auth-contracts index
 
 #### Shared Models Updates
 - [ ] Add User type definition
+- [ ] Add Role and Permission type definitions
 - [ ] Add ServiceToken type definition
 - [ ] Create auth error types
 - [ ] Add rate limit error schema
@@ -200,7 +222,8 @@
 - [ ] Create `auth.service.ts` in ledger-web
 - [ ] Implement login method
   - [ ] POST to /api/v1/auth/login
-  - [ ] Store JWT in localStorage (or sessionStorage)
+  - [ ] Decide token storage model; prefer HttpOnly, Secure, SameSite cookies unless API/client constraints require otherwise
+  - [ ] Do not commit static frontend tokens or fallback JWTs
   - [ ] Store user info in memory
   - [ ] Emit authentication state change
 - [ ] Implement logout method
@@ -240,7 +263,8 @@
 - [ ] Check authentication state
 - [ ] Redirect to login if not authenticated
 - [ ] Store intended URL for post-login redirect
-- [ ] Check route-specific permissions (optional)
+- [ ] Check route-specific permissions
+- [ ] Check route surface metadata (`web`, `tablet`, `mobile`, `public`)
 
 #### Auth State Management
 - [ ] Create auth state using Angular signals or RxJS
@@ -256,6 +280,14 @@
 - [ ] Show user avatar or initials
 - [ ] Add protected route guards to all secure routes
 - [ ] Update navigation to show/hide items based on permissions
+- [ ] Treat the first seeded local admin user as the admin persona until full user management replaces it
+
+#### Role-Specific Route Groups
+- [ ] Define route metadata for web routes in `documentation/platform/rbac-and-views.md`
+- [ ] Add planned web route entries for dashboard, ledger events, orders, inventory, shipping, billing, moderation, devices, proofs, users, roles, and settings
+- [ ] Add planned tablet route entries for receiving, counts, pick-pack, labeling, device pairing, and supervisor views
+- [ ] Add planned mobile route entries for scan, inventory lookup, order lookup, approve, device, proof, and alerts views
+- [ ] Ensure unavailable routes hide from navigation and return a 403-safe page if visited directly
 
 #### Unit Tests
 - [ ] Auth service tests
@@ -322,6 +354,9 @@
   - [ ] Try to navigate to admin page
   - [ ] Verify permission error displayed
   - [ ] Verify no sensitive data exposed
+- [ ] Test tablet route access by role
+- [ ] Test mobile route access by role
+- [ ] Test admin sees current full navigation set
 
 #### Auth Audit Trail E2E Tests
 - [ ] Test login creates audit event
@@ -345,7 +380,7 @@
 #### Technical Documentation
 - [ ] Document authentication architecture in `documentation/platform/security-model.md`
 - [ ] Add JWT token structure reference
-- [ ] Document permission model and available permissions
+- [ ] Keep `documentation/platform/rbac-and-views.md` updated with the implemented role and permission matrix
 - [ ] Create auth endpoint API reference
 - [ ] Document service token creation and management
 - [ ] Add rate limiting configuration guide
@@ -385,7 +420,8 @@ A task is considered complete when:
 
 ### High Priority Risks
 - **JWT Secret Management:** Ensure JWT secrets are never committed to git (mitigation: use .env files, validate in CI)
-- **Token Storage Security:** XSS attacks could steal tokens from localStorage (mitigation: consider httpOnly cookies, add CSP headers)
+- **Token Storage Security:** XSS attacks can steal browser-readable tokens (mitigation: prefer HttpOnly Secure cookies, add CSP headers)
+- **Transport Security:** Credentials must rely on HTTPS/TLS in deployed environments; browser-side encryption is not a replacement for TLS
 - **Rate Limiting Bypass:** Distributed attacks could bypass rate limits (mitigation: test with multiple IPs, consider WAF)
 
 ### Medium Priority Risks

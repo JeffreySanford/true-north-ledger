@@ -171,7 +171,7 @@
 - [ ] Include complete provenance metadata
 - [ ] Add location and quantity to all events
 
-### Unit Tests (Target: 100% Coverage)
+### Unit Tests (Behavior Coverage)
 - [ ] Inventory service tests
   - [ ] Test inventory addition
   - [ ] Test reservation/release

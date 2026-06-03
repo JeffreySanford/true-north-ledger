@@ -11,7 +11,8 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 
 ### PI-Level Acceptance Criteria
 
-- [ ] All actor types (USER, SERVICE, DEVICE, SYSTEM) can authenticate and receive scoped permissions
+- [ ] All actor types (`user`, `service`, `device`, `system`) can authenticate and receive scoped permissions
+- [ ] RBAC roles govern API permissions and web/tablet/mobile route visibility
 - [ ] Devices can register, authenticate, and submit events with proper identity
 - [ ] Orders can be created, updated, and tracked with full ledger audit trail
 - [ ] Inventory operations create verifiable ledger events
@@ -39,7 +40,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 
 ### Sprint Acceptance Criteria
 
-- [ ] JWT-based authentication working for USER actors
+- [ ] JWT-based authentication working for `user` actors
 - [ ] Service token authentication implemented
 - [ ] Permission guard system operational across all endpoints
 - [ ] Auth-related ledger events captured (login, logout, permission denied)
@@ -58,7 +59,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Implement rate limiting middleware (Redis-backed)
 - [ ] Create auth-related ledger event types (LOGIN_SUCCESS, LOGIN_FAILED, PERMISSION_DENIED)
 - [ ] Add tenant isolation to all database queries
-- [ ] Write unit tests for auth service (target: 100% coverage)
+- [ ] Write behavior-focused unit tests for auth service
 - [ ] Write integration tests for auth endpoints
 - [ ] Add OpenAPI decorators to auth endpoints
 
@@ -76,6 +77,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Create auth guard for protected routes
 - [ ] Build logout functionality
 - [ ] Add auth state management (signals/observables)
+- [ ] Add role-aware navigation and route guards for web/tablet/mobile surfaces
 - [ ] Write unit tests for auth service
 
 #### Testing & Documentation
@@ -117,7 +119,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Add nonce tracking for replay protection (Redis-backed)
 - [ ] Build device revocation logic with immediate token invalidation
 - [ ] Create device-related ledger event types (DEVICE_REGISTERED, DEVICE_HEARTBEAT, DEVICE_REVOKED)
-- [ ] Write unit tests for device service (target: 100% coverage)
+- [ ] Write behavior-focused unit tests for device service
 - [ ] Write integration tests for device registration and auth
 - [ ] Add OpenAPI documentation for device endpoints
 
@@ -175,7 +177,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Add correlation ID tracking for related order events
 - [ ] Build order proof generation logic
 - [ ] Create order search with filtering (status, date range, customer)
-- [ ] Write unit tests for order service (target: 100% coverage)
+- [ ] Write behavior-focused unit tests for order service
 - [ ] Write integration tests for order lifecycle
 - [ ] Add OpenAPI documentation for order endpoints
 
@@ -235,7 +237,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Build provenance query endpoint (trace item history)
 - [ ] Implement inventory anomaly detection (unexpected moves, missing items)
 - [ ] Add inventory search with filters (location, SKU, status)
-- [ ] Write unit tests for inventory service (target: 100% coverage)
+- [ ] Write behavior-focused unit tests for inventory service
 - [ ] Write integration tests for inventory operations
 - [ ] Add OpenAPI documentation for inventory endpoints
 

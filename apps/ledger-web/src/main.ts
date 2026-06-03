@@ -1,6 +1,11 @@
-import { platformBrowser } from '@angular/platform-browser';
-import { AppModule } from './app/app-module';
+import 'zone.js';
+import { provideHttpClient } from '@angular/common/http';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideRouter } from '@angular/router';
+import { App } from './app/app';
+import { appRoutes } from './app/app.routes';
 
-platformBrowser()
-  .bootstrapModule(AppModule)
+bootstrapApplication(App, {
+  providers: [provideHttpClient(), provideRouter(appRoutes)],
+})
   .catch((err) => console.error(err));

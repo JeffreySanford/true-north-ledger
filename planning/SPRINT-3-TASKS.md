@@ -143,7 +143,7 @@
   - [ ] Include event type, timestamp, actor, result
 - [ ] Add correlation ID to order detail response
 
-### Unit Tests (Target: 100% Coverage)
+### Unit Tests (Behavior Coverage)
 - [ ] Order service tests
   - [ ] Test order creation
   - [ ] Test order number generation uniqueness

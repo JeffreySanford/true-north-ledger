@@ -4,9 +4,10 @@ import { ZodError } from 'zod';
 
 @Injectable()
 export class ZodValidationPipe implements PipeTransform {
-  constructor(private readonly schema: ZodSchema<any>) {}
+  constructor(private readonly schema: ZodSchema<unknown>) {}
 
-  transform(value: unknown, _metadata: ArgumentMetadata): unknown {
+  transform(value: unknown, metadata: ArgumentMetadata): unknown {
+    void metadata;
     try {
       return this.schema.parse(value);
     } catch (error) {

@@ -16,6 +16,7 @@ flowchart TD
   repo --> nx
   apps --> web
   apps --> e2e
+  apps --> api[ledger-api]
 ```
 
 ## Target Platform
@@ -81,3 +82,4 @@ sequenceDiagram
 - Ledger events are append-only.
 - Feature libraries should expose contracts and behavior, not duplicate domain types.
 - Shared runtime schema contracts should validate the same request, response, and persisted event shapes across frontend, API, and storage.
+- API permissions are enforced before UI route gating; web, tablet, and mobile views should derive visibility from the same role/permission model.

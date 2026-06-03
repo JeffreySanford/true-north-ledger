@@ -18,6 +18,7 @@ Documentation is grouped by topic so project intent, platform design, operations
 - [Ledger Model](platform/ledger-model.md)
 - [Device Ingestion](platform/device-ingestion.md)
 - [Security Model](platform/security-model.md)
+- [RBAC and Role-Specific Views](platform/rbac-and-views.md)
 
 ## Operations
 
@@ -26,5 +27,6 @@ Documentation is grouped by topic so project intent, platform design, operations
 
 ## Development
 
+- [Coding Standards](development/coding-standards.md)
 - [Development Workflow](development/development-workflow.md)
 - [Testing and Quality Gates](development/testing-quality-gates.md)

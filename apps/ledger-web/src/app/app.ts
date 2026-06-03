@@ -1,8 +1,9 @@
 import { Component } from '@angular/core';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'tnl-root',
-  standalone: false,
+  imports: [RouterModule],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })

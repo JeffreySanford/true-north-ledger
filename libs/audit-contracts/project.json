@@ -14,8 +14,7 @@
         "main": "libs/audit-contracts/src/index.ts",
         "tsConfig": "libs/audit-contracts/tsconfig.lib.json",
         "assets": ["libs/audit-contracts/*.md"],
-        "format": ["cjs"],
-        "generatePackageJson": true
+        "format": ["cjs"]
       }
     }
   }

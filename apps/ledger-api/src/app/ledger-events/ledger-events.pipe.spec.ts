@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import type { ZodSchema } from 'zod';
 import { ZodValidationPipe } from './ledger-events.pipe';
 
 describe('ZodValidationPipe', () => {
@@ -49,7 +50,10 @@ describe('ZodValidationPipe', () => {
       fail('Expected BadRequestException to be thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(BadRequestException);
-      const response = (error as BadRequestException).getResponse() as any;
+      const response = (error as BadRequestException).getResponse() as {
+        message: string;
+        details: unknown;
+      };
       expect(response.message).toBe('Validation failed');
       expect(response.details).toBeDefined();
     }
@@ -75,7 +79,7 @@ describe('ZodValidationPipe', () => {
       parse: () => {
         throw new Error('Custom non-Zod error');
       },
-    } as any);
+    } as unknown as ZodSchema<unknown>);
 
     expect(() => malformedPipe.transform({}, { type: 'body' })).toThrow('Custom non-Zod error');
   });

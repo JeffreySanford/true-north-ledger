@@ -49,8 +49,7 @@ __screenshots__/
 
 # Environment files
 .env
+.env.*
 .env.local
 .env.*.local
-# Keep template files
-!.env.development
-!.env.production
+!.env.example

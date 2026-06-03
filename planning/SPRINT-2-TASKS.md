@@ -130,7 +130,7 @@
 - [ ] Ensure all device events include complete metadata
 - [ ] Add device type and device ID to all events
 
-### Unit Tests (Target: 100% Coverage)
+### Unit Tests (Behavior Coverage)
 - [ ] Device service tests
   - [ ] Test device registration
   - [ ] Test API key generation and validation

@@ -1,0 +1,22 @@
+@use 'mixins';
+
+.mat-mdc-button,
+.mat-mdc-raised-button,
+.mat-mdc-outlined-button,
+.mat-mdc-unelevated-button {
+  border-radius: var(--tnl-radius-md);
+  letter-spacing: 0;
+}
+
+.mat-mdc-card {
+  @include mixins.surface;
+}
+
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: var(--tnl-color-inverse-surface);
+  --mdc-snackbar-supporting-text-color: var(--tnl-color-inverse-on-surface);
+}
+
+.cdk-overlay-container {
+  color: var(--tnl-color-on-surface);
+}

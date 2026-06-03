@@ -6,6 +6,7 @@ The API should be designed for humans, services, partners, and devices from the 
 
 - `/api/v1/auth`
 - `/api/v1/users`
+- `/api/v1/roles`
 - `/api/v1/orders`
 - `/api/v1/inventory`
 - `/api/v1/donations`
@@ -19,6 +20,8 @@ The API should be designed for humans, services, partners, and devices from the 
 ## Write Rule
 
 Every API write creates a ledger event.
+
+Role and permission checks must happen before business writes. UI route gating is helpful, but API permission guards are the source of authorization truth.
 
 ## Schema Contracts
 

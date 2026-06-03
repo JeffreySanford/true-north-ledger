@@ -106,7 +106,7 @@ git push
 # In PI-1-PLANNING.md, update Sprint 1 acceptance criteria:
 
 ### Sprint Acceptance Criteria
-- [x] JWT-based authentication working for USER actors
+- [x] JWT-based authentication working for `user` actors
 - [x] Service token authentication implemented
 - [x] Permission guard system operational across all endpoints
 - [x] Auth-related ledger events captured

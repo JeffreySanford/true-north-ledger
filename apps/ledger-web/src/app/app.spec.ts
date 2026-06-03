@@ -10,8 +10,15 @@ import { SettingsPage } from './settings.page';
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [RouterModule.forRoot([]), DashboardPage, LedgerEventsPage, DevicesPage, ProofsPage, SettingsPage],
-      declarations: [App],
+      imports: [
+        RouterModule.forRoot([]),
+        App,
+        DashboardPage,
+        LedgerEventsPage,
+        DevicesPage,
+        ProofsPage,
+        SettingsPage,
+      ],
     }).compileComponents();
   });
 

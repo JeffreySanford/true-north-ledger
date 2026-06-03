@@ -37,6 +37,20 @@ export default [
       '**/*.mjs',
     ],
     // Override or add rules here
-    rules: {},
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'rxjs',
+              importNames: ['firstValueFrom', 'lastValueFrom'],
+              message:
+                'Expose and test Observable streams directly. Promise conversion requires an explicit architecture exception.',
+            },
+          ],
+        },
+      ],
+    },
   },
 ];

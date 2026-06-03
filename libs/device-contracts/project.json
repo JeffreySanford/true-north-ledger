@@ -14,8 +14,7 @@
         "main": "libs/device-contracts/src/index.ts",
         "tsConfig": "libs/device-contracts/tsconfig.lib.json",
         "assets": ["libs/device-contracts/*.md"],
-        "format": ["cjs"],
-        "generatePackageJson": true
+        "format": ["cjs"]
       }
     }
   }

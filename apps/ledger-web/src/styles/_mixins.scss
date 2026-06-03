@@ -1,0 +1,34 @@
+@mixin focus-ring {
+  outline: 3px solid color-mix(in srgb, var(--tnl-color-focus-ring), transparent 35%);
+  outline-offset: 2px;
+}
+
+@mixin surface($container: var(--tnl-color-surface-container-lowest)) {
+  background: $container;
+  color: var(--tnl-color-on-surface);
+  border: var(--tnl-border-subtle);
+  border-radius: var(--tnl-radius-md);
+}
+
+@mixin button-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 var(--tnl-space-5);
+  border-radius: var(--tnl-radius-md);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+}

@@ -318,12 +318,11 @@
   - [ ] monitoring-network
 
 ### Environment Configuration
-- [ ] Update .env.production template
+- [ ] Update deployment secret documentation with production variables
   - [ ] Add all required variables
   - [ ] Document each variable
-  - [ ] Set production defaults
+  - [ ] Avoid committed production defaults for secrets
   - [ ] Add security recommendations
-- [ ] Create .env.production.example
 - [ ] Add validation for required env vars
 - [ ] Document secret management
 

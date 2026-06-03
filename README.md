@@ -8,13 +8,13 @@ The product goal is simple: every actor has an identity, and every meaningful ac
 
 This repository is an Nx workspace using pnpm.
 
-**Current Status:** Early Foundation - Critical Security & Quality Issues Identified
+**Current Status:** Sprint 0 remediation complete; Sprint 1 product auth work next
 
 Implemented now:
 
 - `apps/ledger-web` - Angular web application with routing, SCSS, Vitest, and Playwright
-- `apps/ledger-web-e2e` - Playwright e2e project with 14 quality gates
-- `apps/ledger-api` - NestJS REST API with PostgreSQL persistence and full ledger events module
+- `apps/ledger-web-e2e` - Playwright e2e project with 145 browser quality and full-stack JWT checks
+- `apps/ledger-api` - NestJS REST API with PostgreSQL persistence, authenticated ledger events, and Swagger/OpenAPI docs
 - `libs/shared-models` - Unified contract library exports
 - `libs/ledger-contracts` - Core Zod schemas for ledger events and metadata
 - `libs/auth-contracts` - Actor type and permission schemas  
@@ -23,23 +23,27 @@ Implemented now:
 - Docker Compose infrastructure (PostgreSQL, Redis, PgAdmin)
 
 **Test Status:**
-- Backend: 42 tests (1 failing: deviceId validation)
-- Frontend: 3 tests passing
-- E2E: Not currently passing (timeout issues)
-- Lint: Failing across multiple projects
+- Backend: 42 tests passing
+- Frontend: 4 tests passing
+- E2E: 145 Playwright tests passing across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
+- Lint/build/audit: passing cleanly
 
-**Known Critical Issues:**
-1. ❌ Ledger API has NO authentication/authorization
-2. ❌ Audit chain not implemented (no event_hash, previous_hash)
-3. ❌ Client controls audit metadata (should be server-side)
-4. ❌ Contract schemas too permissive
-5. ❌ Error handling returns 500s instead of proper HTTP codes
+**Remaining Product Gaps:**
+1. Sprint 1 still needs real login/logout/session UX.
+2. Frontend still needs product login/session UX; no token fallback is committed.
+3. Device/service token provisioning and rotation are not productized yet.
+4. Orders, inventory, public proofs, WebSockets, and production monitoring are planned PI-1 work.
+5. Sprint 1 should keep the quality gates clean while adding product authentication.
 
 **Architecture:**
 - Schema-driven contracts with Zod validation across frontend and API
 - Observable-based reactive patterns (RxJS) for all async operations
 - PostgreSQL persistence with TypeORM
-- SHA-256 payload hash verification
+- SHA-256 payload and event hash generation
+- Previous-hash ledger chain linkage
+- JWT, tenant, permission, and rate-limit guards on ledger endpoints
+- Runtime secrets are loaded from ignored `.env.development` / `.env.production` files or deployment secret stores; `.env.example` is placeholder-only
+- Swagger UI at `http://localhost:3000/api/docs`
 - Docker Compose development environment
 
 Planned platform parts:
@@ -131,6 +135,12 @@ pnpm nx test ledger-web
 pnpm nx e2e ledger-web-e2e
 ```
 
+Open API documentation after `pnpm start:all`:
+
+```sh
+http://localhost:3000/api/docs
+```
+
 ### Development Workflow
 
 List all projects:
@@ -153,7 +163,7 @@ pnpm nx run-many -t test
 
 ## Project Planning & Roadmap
 
-**Current Phase:** Foundation Complete - Ready for PI-1
+**Current Phase:** Sprint 0 Complete - Ready for PI-1/Sprint 1
 
 ### Planning Documents
 
@@ -178,16 +188,16 @@ All planning documents are located in the [`planning/`](planning/) folder:
 
 ### What's Next (PI-1 Goals)
 
-By end of PI-1 (10 weeks), the platform will have:
+By end of PI-1 (10 weeks), the platform is planned to have:
 
-- ✅ Secure authentication for all actor types (USER, SERVICE, DEVICE, SYSTEM)
-- ✅ Device registration, authentication, and event ingestion
-- ✅ Orders module with full audit trail
-- ✅ Inventory tracking with device scan integration  
-- ✅ Real-time WebSocket notifications
-- ✅ Production infrastructure with monitoring
-- ✅ Public proof verification system
-- ✅ OpenAPI/Swagger documentation
+- Secure authentication for all actor types (`user`, `service`, `device`, `system`)
+- Device registration, authentication, and event ingestion
+- Orders module with full audit trail
+- Inventory tracking with device scan integration
+- Real-time WebSocket notifications
+- Production infrastructure with monitoring
+- Public proof verification system
+- Expanded OpenAPI/Swagger documentation
 
 ## Documentation
 
@@ -202,6 +212,7 @@ By end of PI-1 (10 weeks), the platform will have:
 - [Ledger Model](documentation/platform/ledger-model.md)
 - [Device Ingestion](documentation/platform/device-ingestion.md)
 - [Security Model](documentation/platform/security-model.md)
+- [RBAC and Role-Specific Views](documentation/platform/rbac-and-views.md)
 - [Data Model](documentation/architecture/data-model.md)
 - [Infrastructure](documentation/operations/infrastructure.md)
 

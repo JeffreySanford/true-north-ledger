@@ -2,6 +2,7 @@ import { Entity, Column, PrimaryColumn, CreateDateColumn, Index } from 'typeorm'
 
 @Entity('ledger_events')
 @Index(['tenantId', 'createdAt'])
+@Index(['tenantId', 'chainSequence'])
 @Index(['actorType', 'actorId'])
 @Index(['subjectType', 'subjectId'])
 @Index(['deviceId'], { where: 'device_id IS NOT NULL' })
@@ -62,7 +63,7 @@ export class LedgerEventEntity {
   @Column({
     type: 'jsonb',
   })
-  payload!: Record<string, any>;
+  payload!: Record<string, unknown>;
 
   // Metadata fields
   @Column({
@@ -114,13 +115,28 @@ export class LedgerEventEntity {
     length: 64,
     nullable: true,
   })
-  previousHash?: string;
+  previousHash?: string | null;
+
+  @Column({
+    name: 'event_hash',
+    type: 'varchar',
+    length: 64,
+    default: '0000000000000000000000000000000000000000000000000000000000000000',
+  })
+  eventHash!: string;
+
+  @Column({
+    name: 'chain_sequence',
+    type: 'bigint',
+    default: 0,
+  })
+  chainSequence!: string;
 
   @Column({
     type: 'varchar',
     length: 20,
   })
-  result!: 'accepted' | 'rejected' | 'pending';
+  result!: 'accepted' | 'rejected' | 'failed';
 
   @Column({
     type: 'timestamp with time zone',

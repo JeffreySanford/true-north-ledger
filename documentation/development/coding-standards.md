@@ -18,9 +18,9 @@ All TypeScript configurations must use modern module resolution strategies:
 
 ## Asynchronous Patterns
 
-### Strong Preference for Observables
+### Observable-First Runtime
 
-**All libraries and applications (frontend and backend) should strongly prefer hot observables and subjects over promises and async/await patterns.**
+**All libraries and applications must expose runtime data flow as Observables. Shared state should be hot and subject-backed. Promise conversion is an exception, not a default.**
 
 #### Why Observables?
 
@@ -39,19 +39,34 @@ All TypeScript configurations must use modern module resolution strategies:
 - Service layer methods that fetch or manipulate data
 - Any operation that might be cancelled
 - Operations that emit multiple values over time
-- State management (using BehaviorSubject or ReplaySubject)
+- State management using `BehaviorSubject`, `ReplaySubject`, or `Subject` with a public `asObservable()` stream
+- NestJS controller return values
 
 ❌ **Avoid Promises/Async-Await for:**
 - HTTP calls (use Observable directly)
 - Service layer business logic
 - Controller endpoints (NestJS supports Observable returns)
 - Event handling
+- Tests for Observable-returning services
+- Converting Observables with `firstValueFrom` or `lastValueFrom`
 
 ⚠️ **Exceptions (where Promises are acceptable):**
-- Browser APIs that only support Promises (e.g., `crypto.subtle.digest`)
-  - Wrap with `from()` operator when returning from a service method
-- Third-party libraries that only provide Promise-based APIs
-- One-off utility functions where observables add no value
+- NestJS application bootstrap and shutdown hooks that are defined by the framework as Promise-based
+- TypeORM migrations and transactions, because TypeORM exposes Promise-only APIs
+- Playwright and Supertest tests, because those libraries are Promise-based
+- Angular/Nest TestBed setup, because compile/init APIs are Promise-based
+- Browser or third-party APIs that only support Promises
+
+When a Promise-only API is required inside application code, isolate it at the boundary and return an Observable from the public method:
+
+```typescript
+return from(promiseOnlyLibraryCall()).pipe(
+  map((result) => normalizeResult(result)),
+  catchError((error) => throwError(() => error)),
+);
+```
+
+New imports of `firstValueFrom` and `lastValueFrom` are blocked by ESLint. If a future case genuinely needs one, document the exception in the code review and update the rule narrowly.
 
 #### Implementation Examples
 
@@ -195,14 +210,50 @@ it('should fetch data', (done) => {
 **Backend (Jest):**
 
 ```typescript
-it('should return data stream', async () => {
-  const data = await firstValueFrom(service.findAll());
-  expect(data).toEqual([...]);
+it('should return data stream', (done) => {
+  service.findAll().subscribe({
+    next: (data) => {
+      expect(data).toEqual([...]);
+      done();
+    },
+    error: done,
+  });
 });
 ```
+
+## Angular Styling and MD3 Foundation
+
+Angular UI styling must start from the shared style foundation in `apps/ledger-web/src/styles/`.
+
+### Style File Responsibilities
+
+- `_colors.scss` - MD3-aligned semantic color tokens.
+- `_vars.scss` - spacing, radii, typography, elevation, and layout tokens.
+- `_mixins.scss` - reusable focus, surface, and control patterns.
+- `_base.scss` - global document and element defaults.
+- `_components.scss` - shared app shell, page, card, button, and list classes.
+- `_material.scss` - Angular Material/CDK-compatible overrides for future Material components.
+
+### Rules
+
+- Prefer CSS custom properties from the shared token files over literal colors, spacing, shadows, or radii in component SCSS.
+- Keep repeated UI classes global when they are shared by multiple pages. Component SCSS should handle only component-specific layout.
+- Cards and controls should use `--tnl-radius-md` or smaller unless a design-system exception is documented.
+- Do not add one-off Material overrides inside feature components. Add shared Material/CDK overrides in `_material.scss`.
+- Keep focus states visible and shared through `_mixins.scss`.
+- Avoid adding large component-level styles that push the Angular `anyComponentStyle` budget; move reusable styling into the shared style layer.
 
 ## Schema Validation
 
 All request and response payloads should be validated using shared Zod schemas from `@true-north-ledger/shared-models`.
 
 See [API Design](../platform/api-design.md#schema-contracts) for details.
+
+## Secrets and Local Environment Files
+
+- Never commit `.env`, `.env.development`, `.env.production`, or any other real `.env.*` file.
+- Commit only safe template files such as `.env.example`; templates must contain variable names and placeholders only, never reusable sample secrets.
+- Runtime code must fail fast when required secrets are missing. Do not add fallback JWT secrets, database passwords, PgAdmin passwords, service tokens, or device tokens.
+- Tests may generate ephemeral secrets in process. Do not hardcode reusable test signing keys.
+- CI secrets must come from the repository or deployment secret store. Do not hardcode CI database passwords or JWT signing keys in workflow YAML.
+- Rotate local development secrets after any secret-scanner alert, even when the exposed values are believed to be samples.

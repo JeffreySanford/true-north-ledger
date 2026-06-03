@@ -38,16 +38,17 @@ Run:
 pnpm nx e2e ledger-web-e2e
 ```
 
-## Planned: `ledger-api`
+## `ledger-api`
 
-NestJS API for the platform.
+Current NestJS API for the platform.
 
-Expected responsibilities:
+Responsibilities:
 
-- Authentication and actor identity.
-- Orders, inventory, donations, proofs, devices, audit, and anomaly endpoints.
-- Ledger event creation for every write.
-- OpenAPI documentation.
+- Authenticated ledger event endpoints.
+- Tenant isolation, permissions, rate limiting, and error normalization.
+- Server-controlled audit metadata and hash-chain fields.
+- Swagger/OpenAPI documentation at `/api/docs` and `/api/docs-json`.
+- Future orders, inventory, donations, proofs, devices, audit, and anomaly endpoints.
 
 ## Planned UI Modes
 
@@ -67,7 +68,7 @@ flowchart LR
 ## Route Intent
 
 - `/dashboard` - command center.
-- `/ledger/events` - event stream and detail review.
+- `/ledger-events` - event stream and detail review.
 - `/orders` - order history and status.
 - `/inventory` - stock and provenance.
 - `/donations` - donation proof administration.
@@ -78,3 +79,5 @@ flowchart LR
 - `/settings` - tenant and platform settings.
 - `/tablet/*` - touch-first operations flows.
 - `/m/*` - mobile scan, approve, alert, and proof flows.
+
+Role and surface-specific route access is defined in [RBAC and Role-Specific Views](../platform/rbac-and-views.md).

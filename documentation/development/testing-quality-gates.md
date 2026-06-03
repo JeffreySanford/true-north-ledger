@@ -4,22 +4,22 @@ Security, auditability, and quality need layered tests. Playwright should enforc
 
 ## Current Quality Metrics
 
-**Backend Test Coverage (ledger-api):**
-- ✅ 100% Statement Coverage
-- ✅ 100% Function Coverage  
-- ✅ 100% Line Coverage
-- ✅ 80.5% Branch Coverage
+Coverage percentages are not currently enforced as a release gate. Use behavior coverage and the command baseline below until explicit coverage thresholds are added.
 
 **Test Suites:**
-- 21 unit tests across 5 test suites
+- `ledger-api`: 7 Jest suites / 42 tests
+- `ledger-web`: 2 Vitest files / 4 tests
 - Device event creation tests
 - Hash validation and integrity tests
 - Observable stream behavior tests
 - Validation pipe error handling tests
 - Controller endpoint tests with error scenarios
+- Auth denial, permission denial, tenant isolation, strict DTO rejection, chain verification, and rate-limit behavior tests
+- CI requires repository secrets `CI_POSTGRES_PASSWORD` and `CI_JWT_SECRET`; do not hardcode reusable CI credentials in workflow YAML.
+- Full-stack Playwright JWT checks cover browser token storage, Angular request headers, API authorization, Postgres persistence, API reload, UI rendering, and unauthorized-token error handling.
 
 **E2E Tests (ledger-web-e2e):**
-- 14 Playwright quality gates
+- 145 Playwright checks across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
 - Responsive design validation (mobile, tablet, desktop)
 - Navigation and accessibility tests
 - Browser error detection

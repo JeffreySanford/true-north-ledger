@@ -28,6 +28,8 @@ export const AuditMetadataSchema = z.object({
   userAgent: z.string().optional(),
   payloadHash: z.string(),
   previousHash: z.string().optional(),
+  eventHash: z.string(),
+  chainSequence: z.number().int().positive(),
   result: EventResultSchema,
   timestamp: z.string().datetime(),
 });
@@ -65,21 +67,45 @@ export const LedgerEventResponseSchema = z.discriminatedUnion('type', [
 ]);
 export type LedgerEventResponse = z.infer<typeof LedgerEventResponseSchema>;
 
-// Base DTO for all ledger events
+export const LedgerChainVerificationResponseSchema = z.object({
+  tenantId: z.string().uuid(),
+  valid: z.boolean(),
+  checkedEvents: z.number().int().nonnegative(),
+  headHash: z.string().optional(),
+  failures: z.array(
+    z.object({
+      eventId: z.string().uuid(),
+      chainSequence: z.number().int().positive(),
+      reason: z.string(),
+    }),
+  ),
+});
+export type LedgerChainVerificationResponse = z.infer<
+  typeof LedgerChainVerificationResponseSchema
+>;
+
+export const ApiErrorResponseSchema = z.object({
+  statusCode: z.number().int().positive(),
+  message: z.union([z.string(), z.array(z.string())]),
+  error: z.string().optional(),
+  details: z.unknown().optional(),
+  requestId: z.string().optional(),
+  correlationId: z.string().optional(),
+});
+export type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>;
+
+// Base DTO for client requests - only business data, no audit metadata
 const baseLedgerEventDto = {
-  actorType: ActorTypeSchema,
-  actorId: z.string(),
-  subjectType: z.string(),
-  subjectId: z.string(),
+  subjectType: z.string().min(1, 'subjectType is required'),
+  subjectId: z.string().min(1, 'subjectId is required'),
   payload: z.record(z.string(), z.any()),
-  metadata: AuditMetadataSchema,
 };
 
 // DTO for standard ledger events
 const StandardLedgerEventDtoSchema = z.object({
   ...baseLedgerEventDto,
   type: z.literal('LEDGER_EVENT'),
-});
+}).strict();
 
 // DTO for device ledger events (requires deviceId and deviceType)
 const DeviceLedgerEventDtoSchema = z.object({
@@ -87,7 +113,7 @@ const DeviceLedgerEventDtoSchema = z.object({
   type: z.literal('DEVICE_LEDGER_EVENT'),
   deviceId: z.string().min(1, 'deviceId is required for DEVICE_LEDGER_EVENT'),
   deviceType: z.string().min(1, 'deviceType is required for DEVICE_LEDGER_EVENT'),
-});
+}).strict();
 
 // Discriminated union for append DTO
 export const AppendLedgerEventDtoSchema = z.discriminatedUnion('type', [

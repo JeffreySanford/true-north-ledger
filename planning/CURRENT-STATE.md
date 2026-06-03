@@ -3,40 +3,45 @@
 **Assessment Date:** 2026-06-03  
 **Project:** True North Ledger  
 **Version:** 0.1.0 (Early Foundation)  
-**Status:** 🚨 CRITICAL ISSUES IDENTIFIED - Remediation Required
+**Status:** Sprint 0 remediation complete; Sprint 1 product auth work next
 
 ---
 
 ## Executive Summary
 
-True North Ledger has a **partial foundation** with PostgreSQL infrastructure and basic CRUD operations. However, a comprehensive security audit revealed **critical gaps** between documentation claims and actual implementation. The platform is **NOT** production-ready and requires immediate remediation before proceeding with planned work.
+True North Ledger now has a **hardened early foundation** for the ledger slice: authenticated ledger endpoints, tenant isolation, permission checks, server-controlled audit metadata, audit chain fields/hashing, database chain constraints, rate limiting, formal error responses, Swagger/OpenAPI docs, CI quality gates, and passing local quality gates. The platform is still **NOT production-ready** because full auth UI/session flows, broader product modules, deployment hardening, and production infrastructure remain.
 
 **Critical Findings:**
-- 🚨 Ledger API has NO authentication/authorization
-- 🚨 Audit chain not implemented (no event_hash, previous_hash)
-- 🚨 Client controls audit metadata (security vulnerability)
-- ⚠️ Tests failing (1 failing, lint broken, E2E timeout)
-- ⚠️ Contract schemas too permissive
+- ✅ Ledger API now requires JWT authentication
+- ✅ Tenant isolation and read/write permission guards are enforced
+- ✅ Audit metadata is server-controlled and client metadata spoofing is rejected
+- ✅ Audit chain fields/hashes are implemented in code (`event_hash`, `previous_hash`, `chain_sequence`)
+- ✅ Database migration adds chain backfill, uniqueness/check constraints, and append-only enforcement
+- ✅ Chain verification endpoint and per-tenant/actor rate limiting are implemented
+- ✅ Swagger UI and OpenAPI JSON are available at `/api/docs` and `/api/docs-json`
+- ✅ Unit, integration, lint, build, audit, and full Playwright E2E gates pass
+- ⚠️ Real login/session UX is not implemented yet
 
-**Next Phase:** Sprint 0 (Remediation) must complete before PI-1 can begin.
+**Next Phase:** PI-1/Sprint 1 can proceed.
 
 ---
 
 ## Critical Issues (BLOCKING)
 
 ### Security Issues 🚨
-1. **No Authentication** - POST /api/v1/ledger/events is publicly writable
-2. **No Audit Chain** - Missing event_hash, previous_hash, chain integrity
-3. **Client-Controlled Metadata** - Audit data comes from untrusted client
-4. **No Tenant Isolation** - No guards prevent cross-tenant access
-5. **No Rate Limiting** - Vulnerable to abuse
+1. **Auth UX Gap** - Frontend requires a locally supplied token until Sprint 1 login/session flow lands
+2. **No Full User Auth Product** - JWT verification exists, but registration/login/logout UI is pending
+   - Required runtime secrets now fail fast when missing instead of using committed fallback values
+3. **No Device/Service Token Product Flow** - Basic actor types exist, but provisioning and rotation are pending
+4. **No Production Deployment Hardening** - Reverse proxy, TLS, monitoring, and deployment runbooks are pending
+5. **No Business Modules Yet** - Orders, inventory, donations, and proof UX remain future sprint work
 
 ### Quality Issues ⚠️
-1. **Failing Tests** - 1 integration test failing (deviceId validation)
-2. **Broken Lint** - ESLint config broken across all projects
-3. **E2E Timeout** - Playwright tests cannot complete
-4. **Poor Error Handling** - Returns 500 instead of 400/404/422
-5. **Permissive Schemas** - Optional fields that should be required
+1. **Swagger Coverage Is Initial** - API docs exist for the current ledger slice; future modules need endpoint examples as they land
+2. **CI/CD Is New** - Quality gates are wired, but branch protection and required-check policy still need repository enforcement
+3. **Coverage Claims Need Discipline** - Behavior coverage is improving; avoid unsupported “100% coverage” claims
+4. **Production Hardening Remains** - Helmet/CORS policy, TLS enforcement, observability, and deployment runbooks are Sprint 1+ work
+5. **No Committed Token Fallback** - Frontend no longer commits a development JWT; Sprint 1 must add product login/session behavior
 
 See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation plan.
 
@@ -48,7 +53,7 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 - [x] Docker Compose with PostgreSQL 16
 - [x] Redis 7 for caching/sessions
 - [x] PgAdmin for database management
-- [x] Environment configuration (.env.development, .env.production)
+- [x] Placeholder-only environment template configuration (`.env.example`); real `.env.*` files stay local
 - [x] Persistent data volumes
 - [x] Health checks on all services
 
@@ -62,6 +67,7 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 - [x] Null-to-undefined conversion for database entities
 - [x] Global validation pipes
 - [x] Error handling and logging
+- [x] Swagger/OpenAPI documentation exposed at `/api/docs` and `/api/docs-json`
 
 ### Contract Libraries ✅
 - [x] ledger-contracts - Core ledger event schemas
@@ -71,7 +77,7 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 - [x] shared-models - Unified exports
 
 ### Frontend Application ✅
-- [x] Angular 19 web application
+- [x] Angular 21 web application
 - [x] Routing with multiple page components
 - [x] Dashboard page (placeholder)
 - [x] Ledger events page (placeholder)
@@ -83,13 +89,14 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 - [x] SCSS styling setup
 
 ### Testing & Quality ✅
-- [x] 31 total tests passing
-  - 22 unit tests (service, controller, pipe)
-  - 9 integration tests (HTTP endpoints)
-- [x] 100% statement coverage (backend)
-- [x] 100% function coverage (backend)
-- [x] 80.5% branch coverage (backend)
-- [x] 14 Playwright E2E quality gates
+- [x] `pnpm nx run-many -t test` passes
+  - ledger-api: 7 suites / 42 tests
+  - ledger-web: 2 files / 4 tests
+- [x] `pnpm nx run-many -t lint` passes cleanly
+- [x] `pnpm nx run-many -t build` passes cleanly
+- [x] `pnpm nx e2e ledger-web-e2e` passes: 145 Playwright tests across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
+- [x] `pnpm audit --audit-level moderate` passes with no known vulnerabilities
+- [x] GitHub Actions quality workflow added for audit, lint, test, build, and E2E
 - [x] Database truncation in integration tests
 - [x] Repository mocking patterns established
 
@@ -105,9 +112,12 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 - [x] Infrastructure plan
 - [x] Development workflow guide
 - [x] Coding standards
+- [x] Initial Swagger/OpenAPI docs for health and ledger endpoints
 
 ### Technical Achievements ✅
-- [x] SHA-256 payload hash verification
+- [x] SHA-256 payload and event hash generation
+- [x] Previous-hash chain linkage and tenant-local chain sequence in application code
+- [x] JWT auth, tenant guard, and permission guard on ledger endpoints
 - [x] Database persistence with audit trail
 - [x] Observable-based reactive patterns
 - [x] Schema-driven validation (Zod)
@@ -121,17 +131,23 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 
 ### Critical Missing Features 🔴
 - [ ] **Authentication & Authorization**
-  - No JWT authentication
-  - No user login/logout
-  - No permission system
-  - No actor identity validation
-  - No session management
+  - No real login/logout UI
+  - No token refresh/session lifecycle
+  - No user registration/invitation flow
+  - No production token storage decision
+  - Device/service provisioning and rotation not productized
+
+- [ ] **Authorization Productization**
+  - Basic permission guard exists
+  - Role/permission administration UI not implemented
+  - Permission model is not yet managed through product workflows
+  - Auth denial audit events still need Sprint 1 product treatment
   
 - [ ] **Device Management**
   - No device registration
-  - No device authentication
+  - No device authentication product flow
   - No device status tracking
-  - No device event ingestion
+  - No dedicated device event ingestion workflow
   
 - [ ] **Business Modules**
   - No orders module
@@ -148,22 +164,22 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
   - No Nginx reverse proxy
   - No SSL/TLS configuration
   - No monitoring (Prometheus/Grafana)
-  - No health check endpoints
+  - No health/readiness endpoints beyond the basic API root
   - No production deployment docs
 
 ### Medium Priority Gaps 🟡
-- [ ] Rate limiting not implemented
-- [ ] Tenant isolation not enforced
-- [ ] Ledger hash chain not verified
-- [ ] Previous hash tracking incomplete
-- [ ] Correlation ID not used
-- [ ] Request ID not captured
-- [ ] Source IP not logged
-- [ ] User agent not captured
+- [x] Rate limiting implemented for ledger writes
+- [x] Tenant isolation enforced for ledger endpoints
+- [x] Ledger hash chain verification endpoint implemented
+- [x] Previous hash tracking implemented in application code
+- [x] Correlation ID captured/generated for ledger appends
+- [x] Request ID captured/generated for ledger appends
+- [x] Source IP captured where available from request
+- [x] User agent captured where available from request
+- [x] Initial API documentation (Swagger/OpenAPI) generated
 - [ ] Audit trail UI not functional
 - [ ] Search/filter functionality missing
 - [ ] Pagination not implemented
-- [ ] API documentation (Swagger) not generated
 
 ### Low Priority Gaps 🟢
 - [ ] MQTT broker (deferred to PI-2)
@@ -353,15 +369,15 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 
 **HIGH RISKS:**
 1. ✅ **Database Migration** - RESOLVED (Postgres working)
-2. ✅ **Test Coverage** - RESOLVED (100% backend coverage)
-3. 🔴 **Authentication Security** - UNRESOLVED (not implemented)
+2. ✅ **Test Execution** - RESOLVED (unit/integration/E2E gates pass)
+3. 🟡 **Authentication Security** - PARTIAL (JWT/guards implemented; real login/session/device auth pending)
 4. 🔴 **Production Readiness** - UNRESOLVED (no deployment plan)
 5. 🔴 **Real-time Performance** - UNRESOLVED (WebSockets not implemented)
 
 **MEDIUM RISKS:**
 1. 🟡 **Contract Sync** - MONITORED (working but needs discipline)
 2. 🟡 **Device Volume** - MONITORED (will assess in Sprint 2)
-3. 🟡 **Ledger Integrity** - MONITORED (hashing works, chain verification needed)
+3. 🟡 **Ledger Integrity** - MONITORED (hashing, chain linkage, migration constraints, and verification endpoint are implemented; concurrency hardening should continue as write volume grows)
 
 **LOW RISKS:**
 1. 🟢 **Technology Stack** - STABLE (NestJS + Angular + Postgres proven)
@@ -445,7 +461,9 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 |------|--------|--------|
 | 2026-06-03 | Completed Postgres migration | Foundation for all future work |
 | 2026-06-03 | Created PI-1 planning documents | Roadmap for next 10 weeks |
-| Future | Auth implementation (Sprint 1) | Platform becomes secure |
+| 2026-06-03 | Sprint 0 auth/ledger hardening | Ledger endpoints now require JWT, tenant isolation, permissions, server metadata, and chain hashes |
+| 2026-06-03 | Added Swagger/OpenAPI docs | API docs exposed at `/api/docs` and `/api/docs-json` |
+| Future | Full auth implementation (Sprint 1) | Login/session/device/service auth becomes product-ready |
 | Future | Device management (Sprint 2) | Devices get identity |
 | Future | Orders module (Sprint 3) | Core business workflow |
 | Future | Inventory module (Sprint 4) | Supply chain tracking |
@@ -466,8 +484,10 @@ pnpm nx serve ledger-api
 # Serve Web
 pnpm nx serve ledger-web
 
-# Run all tests
-pnpm nx test ledger-api
+# Run quality gates
+pnpm nx run-many -t test
+pnpm nx run-many -t lint
+pnpm nx run-many -t build
 pnpm nx e2e ledger-web-e2e
 
 # Check database
@@ -479,14 +499,18 @@ docker exec -it true-north-ledger-db psql -U ledger_user -d ledger_dev
 - `/SPRINT-1-TASKS.md` - Current sprint tasks
 - `/PI-PLANNING-GUIDE.md` - How to use planning docs
 - `/documentation/**` - Architecture & design docs
+- `/.env.example` - Placeholder-only environment template
 - `/.env.development` - Local environment config (not in git)
-- `/.env.production` - Production template (in git)
+- `/.env.production` - Production environment config (not in git)
 
 ### Key Endpoints (Current)
 - `GET /api` - API health check
 - `GET /api/v1/ledger/events` - List all ledger events
+- `GET /api/v1/ledger/events/chain/verify` - Verify tenant ledger chain integrity
 - `GET /api/v1/ledger/events/:id` - Get event by ID
 - `POST /api/v1/ledger/events` - Create ledger event
+- `GET /api/docs` - Swagger UI
+- `GET /api/docs-json` - OpenAPI JSON
 
 ### Database Tables (Current)
 - `ledger_events` - All audit trail events

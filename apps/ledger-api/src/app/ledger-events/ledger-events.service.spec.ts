@@ -1,286 +1,268 @@
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { LedgerEventsService } from './ledger-events.service';
 import { LedgerEventEntity } from './ledger-event.entity';
-import { createHash } from 'crypto';
-import { firstValueFrom } from 'rxjs';
+import { LedgerEventsService } from './ledger-events.service';
 
 describe('LedgerEventsService', () => {
+  const tenantId = '00000000-0000-0000-0000-000000000000';
+  const actor = {
+    userId: 'test-user',
+    actorType: 'user',
+    tenantId,
+  };
+
   let service: LedgerEventsService;
   let repository: jest.Mocked<Repository<LedgerEventEntity>>;
+  let transactionalRepository: jest.Mocked<Repository<LedgerEventEntity>>;
+
+  function computeEventHash(entity: LedgerEventEntity): string {
+    return (service as unknown as { computeEventHash(entity: LedgerEventEntity): string }).computeEventHash(
+      entity,
+    );
+  }
 
   beforeEach(async () => {
-    const mockRepository = {
-      find: jest.fn(),
+    transactionalRepository = {
       findOne: jest.fn(),
       save: jest.fn(),
-    };
+    } as unknown as jest.Mocked<Repository<LedgerEventEntity>>;
+
+    repository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      manager: {
+        transaction: jest.fn((callback) =>
+          callback({
+            getRepository: jest.fn(() => transactionalRepository),
+          }),
+        ),
+      },
+    } as unknown as jest.Mocked<Repository<LedgerEventEntity>>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LedgerEventsService,
         {
           provide: getRepositoryToken(LedgerEventEntity),
-          useValue: mockRepository,
+          useValue: repository,
         },
       ],
     }).compile();
 
     service = module.get<LedgerEventsService>(LedgerEventsService);
-    repository = module.get(getRepositoryToken(LedgerEventEntity));
   });
 
-  function makePayloadHash(payload: unknown): string {
-    return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  function savedEntity(overrides: Partial<LedgerEventEntity> = {}): LedgerEventEntity {
+    return {
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      type: 'LEDGER_EVENT',
+      actorType: 'user',
+      actorId: 'test-user',
+      subjectType: 'order',
+      subjectId: 'order-1',
+      payload: { action: 'created' },
+      tenantId,
+      requestId: 'request-1',
+      correlationId: 'correlation-1',
+      sourceIp: '127.0.0.1',
+      userAgent: 'jest',
+      payloadHash: 'a'.repeat(64),
+      previousHash: null,
+      eventHash: 'b'.repeat(64),
+      chainSequence: '1',
+      result: 'accepted',
+      timestamp: new Date('2026-06-03T12:00:00.000Z'),
+      createdAt: new Date('2026-06-03T12:00:00.000Z'),
+      ...overrides,
+    } as LedgerEventEntity;
   }
 
-  it('should append a ledger event and return it', async () => {
-    const payload = { action: 'create' };
-    const dto = {
-      type: 'LEDGER_EVENT',
-      actorType: 'user',
-      actorId: 'test-user',
-      subjectType: 'test',
-      subjectId: 'subject-1',
-      payload,
-      metadata: {
-        tenantId: '00000000-0000-0000-0000-000000000000',
-        requestId: 'request-1',
-        correlationId: undefined,
-        sourceIp: undefined,
-        userAgent: 'test-agent',
-        payloadHash: makePayloadHash(payload),
-        previousHash: undefined,
-        result: 'accepted',
-        timestamp: new Date().toISOString(),
+  it('returns events scoped to a tenant', (done) => {
+    repository.find.mockResolvedValue([savedEntity()]);
+
+    service.findAll(tenantId).subscribe({
+      next: (result) => {
+        expect(result).toHaveLength(1);
+        expect(repository.find).toHaveBeenCalledWith({
+          where: { tenantId },
+          order: { createdAt: 'ASC' },
+        });
+        done();
       },
-    } as const;
-
-    const savedEntity = {
-      id: '550e8400-e29b-41d4-a716-446655440000',
-      type: 'LEDGER_EVENT' as const,
-      actorType: 'user',
-      actorId: 'test-user',
-      subjectType: 'test',
-      subjectId: 'subject-1',
-      payload,
-      tenantId: '00000000-0000-0000-0000-000000000000',
-      requestId: 'request-1',
-      correlationId: undefined,
-      sourceIp: undefined,
-      userAgent: 'test-agent',
-      payloadHash: makePayloadHash(payload),
-      previousHash: undefined,
-      result: 'accepted' as const,
-      timestamp: new Date(),
-      createdAt: new Date(),
-    };
-
-    repository.save.mockResolvedValue(savedEntity as LedgerEventEntity);
-
-    const event = await firstValueFrom(service.appendEvent(dto));
-
-    expect(event).toMatchObject({
-      type: 'LEDGER_EVENT',
-      actorId: 'test-user',
-      subjectId: 'subject-1',
+      error: done,
     });
-    expect(event.id).toBe('550e8400-e29b-41d4-a716-446655440000');
-    expect(event.createdAt).toBeDefined();
   });
 
-  it('should reject an event with a mismatched payload hash', async () => {
-    const payload = { action: 'create' };
-    const dto = {
-      type: 'LEDGER_EVENT',
-      actorType: 'user',
-      actorId: 'test-user',
-      subjectType: 'test',
-      subjectId: 'subject-1',
-      payload,
-      metadata: {
-        tenantId: '00000000-0000-0000-0000-000000000000',
-        requestId: 'request-1',
-        correlationId: undefined,
-        sourceIp: undefined,
-        userAgent: 'test-agent',
-        payloadHash: 'invalid-hash',
-        previousHash: undefined,
-        result: 'accepted',
-        timestamp: new Date().toISOString(),
+  it('returns one event scoped to a tenant', (done) => {
+    const id = '550e8400-e29b-41d4-a716-446655440000';
+    repository.findOne.mockResolvedValue(savedEntity({ id }));
+
+    service.findOne(id, tenantId).subscribe({
+      next: (result) => {
+        expect(result.id).toBe(id);
+        expect(repository.findOne).toHaveBeenCalledWith({ where: { id, tenantId } });
+        done();
       },
-    } as const;
-
-    await expect(firstValueFrom(service.appendEvent(dto))).rejects.toThrow(
-      'payloadHash mismatch for supplied payload'
-    );
-  });
-
-  it('should return all events from database', async () => {
-    const entities = [
-      {
-        id: '550e8400-e29b-41d4-a716-446655440001',
-        type: 'LEDGER_EVENT' as const,
-        actorType: 'user',
-        actorId: 'test-user',
-        subjectType: 'test',
-        subjectId: 'subject-1',
-        payload: { action: 'create' },
-        tenantId: '00000000-0000-0000-0000-000000000000',
-        requestId: 'request-1',
-        userAgent: 'test-agent',
-        payloadHash: makePayloadHash({ action: 'create' }),
-        result: 'accepted' as const,
-        timestamp: new Date(),
-        createdAt: new Date(),
-      } as LedgerEventEntity,
-    ];
-
-    repository.find.mockResolvedValue(entities);
-
-    const allEvents = await firstValueFrom(service.findAll());
-
-    expect(allEvents).toHaveLength(1);
-    expect(allEvents[0].actorId).toBe('test-user');
-    expect(repository.find).toHaveBeenCalledWith({ order: { createdAt: 'ASC' } });
-  });
-
-  it('should append a device ledger event with deviceId and deviceType', async () => {
-    const payload = { temperature: 22.5, humidity: 45 };
-    const dto = {
-      type: 'DEVICE_LEDGER_EVENT',
-      actorType: 'device',
-      actorId: 'sensor-001',
-      subjectType: 'measurement',
-      subjectId: 'temp-reading-1',
-      deviceId: 'sensor-001',
-      deviceType: 'temperature-sensor',
-      payload,
-      metadata: {
-        tenantId: '00000000-0000-0000-0000-000000000000',
-        requestId: 'device-request-1',
-        correlationId: undefined,
-        sourceIp: undefined,
-        userAgent: 'IoT-Agent/1.0',
-        payloadHash: makePayloadHash(payload),
-        previousHash: undefined,
-        result: 'accepted',
-        timestamp: new Date().toISOString(),
-      },
-    } as const;
-
-    const savedEntity = {
-      id: '550e8400-e29b-41d4-a716-446655440002',
-      type: 'DEVICE_LEDGER_EVENT' as const,
-      actorType: 'device',
-      actorId: 'sensor-001',
-      subjectType: 'measurement',
-      subjectId: 'temp-reading-1',
-      deviceId: 'sensor-001',
-      deviceType: 'temperature-sensor',
-      payload,
-      tenantId: '00000000-0000-0000-0000-000000000000',
-      requestId: 'device-request-1',
-      userAgent: 'IoT-Agent/1.0',
-      payloadHash: makePayloadHash(payload),
-      result: 'accepted' as const,
-      timestamp: new Date(),
-      createdAt: new Date(),
-    } as LedgerEventEntity;
-
-    repository.save.mockResolvedValue(savedEntity);
-
-    const event = await firstValueFrom(service.appendEvent(dto));
-
-    expect(event).toMatchObject({
-      type: 'DEVICE_LEDGER_EVENT',
-      deviceId: 'sensor-001',
-      deviceType: 'temperature-sensor',
-      actorId: 'sensor-001',
+      error: done,
     });
-    expect(event.id).toBe('550e8400-e29b-41d4-a716-446655440002');
   });
 
-  it('should find a specific event by id', async () => {
-    const entity = {
-      id: '550e8400-e29b-41d4-a716-446655440003',
-      type: 'LEDGER_EVENT' as const,
-      actorType: 'user',
-      actorId: 'user-1',
-      subjectType: 'test',
-      subjectId: 'subject-1',
-      payload: { action: 'test' },
-      tenantId: '00000000-0000-0000-0000-000000000000',
-      requestId: 'req-1',
-      userAgent: 'test',
-      payloadHash: makePayloadHash({ action: 'test' }),
-      result: 'accepted' as const,
-      timestamp: new Date(),
-      createdAt: new Date(),
-    } as LedgerEventEntity;
-
-    repository.findOne.mockResolvedValue(entity);
-
-    const found = await firstValueFrom(service.findOne('550e8400-e29b-41d4-a716-446655440003'));
-
-    expect(found.id).toBe('550e8400-e29b-41d4-a716-446655440003');
-    expect(found.actorId).toBe('user-1');
-    expect(repository.findOne).toHaveBeenCalledWith({ where: { id: '550e8400-e29b-41d4-a716-446655440003' } });
+  it('rejects invalid event ids before querying the database', (done) => {
+    service.findOne('not-a-uuid', tenantId).subscribe({
+      next: () => done(new Error('Expected invalid ledger event id to fail')),
+      error: (error) => {
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect(repository.findOne).not.toHaveBeenCalled();
+        done();
+      },
+    });
   });
 
-  it('should throw error when event not found by id', async () => {
+  it('returns not found for a missing tenant-scoped event', (done) => {
     repository.findOne.mockResolvedValue(null);
 
-    await expect(firstValueFrom(service.findOne('non-existent-id'))).rejects.toThrow(
-      'Ledger event non-existent-id not found'
-    );
-  });
-
-  it('should reject invalid schema data', async () => {
-    const invalidDto = {
-      type: 'INVALID_TYPE',
-      actorType: 'user',
-      actorId: 'test',
-      subjectType: 'test',
-      subjectId: 'test',
-      payload: {},
-      metadata: {},
-    };
-
-    await expect(firstValueFrom(service.appendEvent(invalidDto))).rejects.toThrow();
-  });
-
-  it('should handle database errors gracefully on findAll', async () => {
-    repository.find.mockRejectedValue(new Error('Database connection failed'));
-
-    await expect(firstValueFrom(service.findAll())).rejects.toThrow('Database connection failed');
-  });
-
-  it('should handle database errors gracefully on save', async () => {
-    const payload = { action: 'create' };
-    const dto = {
-      type: 'LEDGER_EVENT',
-      actorType: 'user',
-      actorId: 'test-user',
-      subjectType: 'test',
-      subjectId: 'subject-1',
-      payload,
-      metadata: {
-        tenantId: '00000000-0000-0000-0000-000000000000',
-        requestId: 'request-1',
-        correlationId: undefined,
-        sourceIp: undefined,
-        userAgent: 'test-agent',
-        payloadHash: makePayloadHash(payload),
-        previousHash: undefined,
-        result: 'accepted',
-        timestamp: new Date().toISOString(),
+    service.findOne('550e8400-e29b-41d4-a716-446655440000', tenantId).subscribe({
+      next: () => done(new Error('Expected missing ledger event to fail')),
+      error: (error) => {
+        expect(error).toBeInstanceOf(NotFoundException);
+        done();
       },
-    } as const;
+    });
+  });
 
-    repository.save.mockRejectedValue(new Error('Database write failed'));
+  it('appends an event with server-controlled audit metadata and chain fields', (done) => {
+    transactionalRepository.findOne.mockResolvedValue(null);
+    transactionalRepository.save.mockImplementation(async (entity) => ({
+      ...entity,
+      createdAt: new Date('2026-06-03T12:00:00.000Z'),
+    }) as LedgerEventEntity);
 
-    await expect(firstValueFrom(service.appendEvent(dto))).rejects.toThrow('Database write failed');
+    service
+      .appendEvent(
+        {
+          type: 'LEDGER_EVENT',
+          subjectType: 'order',
+          subjectId: 'order-1',
+          payload: { b: 2, a: 1 },
+        },
+        actor,
+        tenantId,
+        { sourceIp: '127.0.0.1', userAgent: 'jest', correlationId: 'corr-1' },
+      )
+      .subscribe({
+        next: (result) => {
+          expect(result.actorId).toBe('test-user');
+          expect(result.metadata.tenantId).toBe(tenantId);
+          expect(result.metadata.chainSequence).toBe(1);
+          expect(result.metadata.eventHash).toHaveLength(64);
+          expect(result.metadata.payloadHash).toHaveLength(64);
+          expect(result.metadata.userAgent).toBe('jest');
+          expect(result.metadata.sourceIp).toBe('127.0.0.1');
+          done();
+        },
+        error: done,
+      });
+  });
+
+  it('links a new event to the previous tenant event', (done) => {
+    transactionalRepository.findOne.mockResolvedValue(
+      savedEntity({ eventHash: 'c'.repeat(64), chainSequence: '7' }),
+    );
+    transactionalRepository.save.mockImplementation(async (entity) => ({
+      ...entity,
+      createdAt: new Date('2026-06-03T12:00:00.000Z'),
+    }) as LedgerEventEntity);
+
+    service
+      .appendEvent(
+        {
+          type: 'LEDGER_EVENT',
+          subjectType: 'order',
+          subjectId: 'order-2',
+          payload: { action: 'updated' },
+        },
+        actor,
+        tenantId,
+      )
+      .subscribe({
+        next: (result) => {
+          expect(result.metadata.previousHash).toBe('c'.repeat(64));
+          expect(result.metadata.chainSequence).toBe(8);
+          done();
+        },
+        error: done,
+      });
+  });
+
+  it('verifies a valid tenant chain', (done) => {
+    const first = savedEntity({ chainSequence: '1', previousHash: null });
+    first.eventHash = computeEventHash(first);
+    const second = savedEntity({
+      id: '550e8400-e29b-41d4-a716-446655440001',
+      subjectId: 'order-2',
+      chainSequence: '2',
+      previousHash: first.eventHash,
+    });
+    second.eventHash = computeEventHash(second);
+    repository.find.mockResolvedValue([first, second]);
+
+    service.verifyChain(tenantId).subscribe({
+      next: (result) => {
+        expect(result.valid).toBe(true);
+        expect(result.checkedEvents).toBe(2);
+        expect(result.headHash).toBe(second.eventHash);
+        expect(result.failures).toEqual([]);
+        done();
+      },
+      error: done,
+    });
+  });
+
+  it('reports chain verification failures', (done) => {
+    repository.find.mockResolvedValue([
+      savedEntity({
+        chainSequence: '2',
+        previousHash: 'bad-previous-hash',
+        eventHash: 'bad-event-hash',
+      }),
+    ]);
+
+    service.verifyChain(tenantId).subscribe({
+      next: (result) => {
+        expect(result.valid).toBe(false);
+        expect(result.failures.map((failure) => failure.reason)).toEqual([
+          'Expected chain sequence 1',
+          'Previous hash does not match prior event hash',
+          'Event hash does not match canonical event data',
+        ]);
+        done();
+      },
+      error: done,
+    });
+  });
+
+  it('rejects client-supplied audit metadata', (done) => {
+    service
+      .appendEvent(
+        {
+          type: 'LEDGER_EVENT',
+          actorId: 'spoofed',
+          subjectType: 'order',
+          subjectId: 'order-1',
+          payload: { action: 'created' },
+          metadata: { tenantId: 'spoofed' },
+        },
+        actor,
+        tenantId,
+      )
+      .subscribe({
+        next: () => done(new Error('Expected client-supplied audit metadata to fail')),
+        error: (error) => {
+          expect(error).toBeInstanceOf(BadRequestException);
+          done();
+        },
+      });
   });
 });

@@ -14,8 +14,7 @@
         "main": "libs/ledger-contracts/src/index.ts",
         "tsConfig": "libs/ledger-contracts/tsconfig.lib.json",
         "assets": ["libs/ledger-contracts/*.md"],
-        "format": ["cjs"],
-        "generatePackageJson": true
+        "format": ["cjs"]
       }
     }
   }
