@@ -80,3 +80,4 @@ sequenceDiagram
 - MQTT is deferred until device volume or protocol requirements justify it.
 - Ledger events are append-only.
 - Feature libraries should expose contracts and behavior, not duplicate domain types.
+- Shared runtime schema contracts should validate the same request, response, and persisted event shapes across frontend, API, and storage.

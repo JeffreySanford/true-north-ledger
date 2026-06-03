@@ -57,7 +57,11 @@
           "buildTarget": "ledger-web:build:development"
         }
       },
-      "defaultConfiguration": "development"
+      "defaultConfiguration": "development",
+      "dependsOn": ["ledger-api:serve"],
+      "options": {
+        "proxyConfig": "apps/ledger-web/proxy.conf.json"
+      }
     },
     "lint": {
       "executor": "@nx/eslint:lint"

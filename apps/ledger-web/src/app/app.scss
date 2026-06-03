@@ -1,0 +1,102 @@
+:host {
+  display: block;
+  font-family: system-ui, sans-serif;
+  color: #1f2937;
+}
+
+.app-shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(90deg, #0f172a, #1e293b);
+  color: white;
+}
+
+.app-shell .brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.app-shell nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.app-shell a {
+  color: #cbd5e1;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.app-shell a.active,
+.app-shell a:hover {
+  color: white;
+}
+
+.app-body {
+  padding: 1.5rem;
+  min-height: calc(100vh - 80px);
+  background: #f8fafc;
+}
+
+.page-heading {
+  margin-top: 0;
+  color: #111827;
+}
+
+.section-card {
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  background: white;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  background: white;
+  color: #111827;
+  cursor: pointer;
+}
+
+.event-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.event-list li {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 0.75rem;
+}

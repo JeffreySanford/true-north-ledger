@@ -1,0 +1,9 @@
+{
+  "name": "device-contracts",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/device-contracts/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:device"],
+  "// targets": "to see all targets run: nx show project device-contracts --web",
+  "targets": {}
+}

@@ -20,6 +20,10 @@ The API should be designed for humans, services, partners, and devices from the 
 
 Every API write creates a ledger event.
 
+## Schema Contracts
+
+Requests and responses are validated by shared Zod schemas in `libs/shared-models` and `libs/ledger-contracts`. This ensures the frontend and API agree on event shape, metadata requirements, and audit fields.
+
 ```mermaid
 flowchart TD
   createOrder[POST /orders]

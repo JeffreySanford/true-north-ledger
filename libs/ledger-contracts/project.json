@@ -1,0 +1,9 @@
+{
+  "name": "ledger-contracts",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ledger-contracts/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:ledger"],
+  "// targets": "to see all targets run: nx show project ledger-contracts --web",
+  "targets": {}
+}

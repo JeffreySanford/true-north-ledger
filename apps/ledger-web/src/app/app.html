@@ -1,2 +1,13 @@
-<tnl-nx-welcome></tnl-nx-welcome>
-<router-outlet></router-outlet>
+<header class="app-shell">
+  <div class="brand">True North Ledger</div>
+  <nav data-testid="app-nav">
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+    <a routerLink="/ledger-events" routerLinkActive="active">Ledger Events</a>
+    <a routerLink="/devices" routerLinkActive="active">Devices</a>
+    <a routerLink="/proofs" routerLinkActive="active">Proofs</a>
+    <a routerLink="/settings" routerLinkActive="active">Settings</a>
+  </nav>
+</header>
+<main class="app-body">
+  <router-outlet></router-outlet>
+</main>

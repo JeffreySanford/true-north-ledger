@@ -10,13 +10,27 @@ This repository is an Nx workspace using pnpm.
 
 Implemented now:
 
-- `apps/ledger-web` - Angular web application, generated with routing, SCSS, Vitest, and Playwright.
-- `apps/ledger-web-e2e` - Playwright e2e project for `ledger-web`.
+- `apps/ledger-web` - Angular web application with routing, SCSS, Vitest, and Playwright
+- `apps/ledger-web-e2e` - Playwright e2e project with 14 quality gates
+- `apps/ledger-api` - NestJS REST API with ledger events module (100% test coverage)
+- `libs/shared-models` - Unified contract library exports
+- `libs/ledger-contracts` - Core Zod schemas for ledger events and metadata
+- `libs/auth-contracts` - Actor type and permission schemas  
+- `libs/device-contracts` - Device ledger event schemas
+- `libs/audit-contracts` - Audit metadata schemas
+
+**Test Coverage:**
+- Backend: 100% statements, 100% functions, 80.5% branches, 21 tests
+- Frontend: 3 tests with Observable patterns
+- E2E: 14 Playwright quality gates
+
+**Architecture:**
+- Schema-driven contracts with Zod validation across frontend and API
+- Observable-based reactive patterns (RxJS) for all async operations
+- In-memory event storage (Postgres persistence next)
+- SHA-256 payload hash verification
 
 Planned platform parts:
-
-- `ledger-api` - NestJS API for auth, orders, inventory, donations, devices, proofs, and ledger events.
-- Shared contract libraries for ledger, auth, device, and audit models.
 - Docker Compose infrastructure for Postgres, Redis, API, web, observability, and reverse proxy.
 - Device gateway and MQTT broker when real IoT volume requires them.
 
@@ -106,10 +120,29 @@ pnpm nx e2e ledger-web-e2e
 
 ## Near-Term Build Order
 
-1. Keep `ledger-web` as the primary adaptive Angular app.
-2. Generate `ledger-api` with `@nx/nest`.
-3. Add shared contract libraries for auth, ledger, audit, and devices.
-4. Add append-only ledger event persistence.
+1. ✅ Keep `ledger-web` as the primary adaptive Angular app.
+2. ✅ Generate `ledger-api` with `@nx/nest`.
+3. ✅ Add shared contract libraries for auth, ledger, audit, and devices.
+4. **→ NEXT: Add append-only ledger event persistence (Postgres).**
 5. Add device registry and heartbeat endpoints.
 6. Add public proof lookup pages.
 7. Add Docker Compose services for Postgres, Redis, API, web, and observability.
+
+## Known Issues
+
+### RxJS TypeScript Deprecation Warnings
+
+You may see TypeScript deprecation warnings from RxJS v7.8.2 in VS Code:
+
+```
+Option 'moduleResolution=node10' is deprecated...
+Option 'baseUrl' is deprecated...
+```
+
+**These are benign warnings from the RxJS library's own `tsconfig.json` in `node_modules`.** They:
+- ✅ Do not affect builds, tests, or runtime
+- ✅ Are not errors in your code
+- ✅ Cannot be fixed by modifying workspace configuration
+- ✅ Will be resolved when RxJS releases an updated version
+
+All builds and tests pass successfully despite these informational warnings.

@@ -36,6 +36,7 @@ flowchart LR
 
 - Validate actor permissions.
 - Normalize event payloads.
+- Enforce shared schema contracts before persisting ledger events.
 - Hash the payload and previous event reference.
 - Write inside a database transaction.
 - Emit notifications after durable persistence.

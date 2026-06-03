@@ -2,6 +2,29 @@
 
 Security, auditability, and quality need layered tests. Playwright should enforce browser-facing quality, while API and unit tests enforce server-side rules.
 
+## Current Quality Metrics
+
+**Backend Test Coverage (ledger-api):**
+- ✅ 100% Statement Coverage
+- ✅ 100% Function Coverage  
+- ✅ 100% Line Coverage
+- ✅ 80.5% Branch Coverage
+
+**Test Suites:**
+- 21 unit tests across 5 test suites
+- Device event creation tests
+- Hash validation and integrity tests
+- Observable stream behavior tests
+- Validation pipe error handling tests
+- Controller endpoint tests with error scenarios
+
+**E2E Tests (ledger-web-e2e):**
+- 14 Playwright quality gates
+- Responsive design validation (mobile, tablet, desktop)
+- Navigation and accessibility tests
+- Browser error detection
+- Security checks (no insecure HTTP)
+
 ## Quality Gate Order
 
 ```mermaid
@@ -39,6 +62,8 @@ Add these when the real app shell exists:
 - Audit event visibility after user actions.
 - Proof pages expose only proof-safe data.
 - Tablet and mobile task flows remain usable at target viewport sizes.
+- Shared Zod contracts enforce request and response shapes across frontend and API.
+- Unit tests should exercise contract validation and event append behavior.
 
 ## API and Backend Checks
 

@@ -27,7 +27,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm nx run ledger-web:serve --configuration=development',
+    command: 'pnpm start:full',
     url: baseURL,
     reuseExistingServer: true,
     cwd: workspaceRoot,

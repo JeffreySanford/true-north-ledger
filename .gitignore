@@ -46,3 +46,11 @@ Thumbs.db
 .angular
 
 __screenshots__/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+# Keep template files
+!.env.development
+!.env.production
