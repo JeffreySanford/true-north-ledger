@@ -16,7 +16,7 @@ jobs:
         env:
           POSTGRES_DB: ledger_dev
           POSTGRES_USER: ledger_user
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'ledger_ci_password' }}
         ports:
           - 5432:5432
         options: >-
@@ -32,8 +32,8 @@ jobs:
       POSTGRES_PORT: 5432
       POSTGRES_DB: ledger_dev
       POSTGRES_USER: ledger_user
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'ledger_ci_password' }}
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET || 'ledger_ci_jwt_secret' }}
 
     steps:
       - name: Checkout
