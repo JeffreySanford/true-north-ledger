@@ -255,4 +255,293 @@ describe('LedgerEventsController (Integration)', () => {
       expect(orderTestEvents.length).toBeGreaterThanOrEqual(3);
     });
   });
+
+  describe('Additional Error Scenarios', () => {
+    it('should reject event with invalid actor type', () => {
+      const payload = { action: 'test' };
+      const dto = {
+        type: 'LEDGER_EVENT',
+        actorType: 'invalid_actor',
+        actorId: 'test-user',
+        subjectType: 'test',
+        subjectId: 'test-subject',
+        payload,
+        metadata: {
+          tenantId: '00000000-0000-0000-0000-000000000000',
+          requestId: 'req-1',
+          userAgent: 'test',
+          payloadHash: computeHash(payload),
+          result: 'accepted',
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return request(app.getHttpServer())
+        .post('/api/v1/ledger/events')
+        .send(dto)
+        .expect(400);
+    });
+
+    it('should reject event with invalid result value', () => {
+      const payload = { action: 'test' };
+      const dto = {
+        type: 'LEDGER_EVENT',
+        actorType: 'user',
+        actorId: 'test-user',
+        subjectType: 'test',
+        subjectId: 'test-subject',
+        payload,
+        metadata: {
+          tenantId: '00000000-0000-0000-0000-000000000000',
+          requestId: 'req-1',
+          userAgent: 'test',
+          payloadHash: computeHash(payload),
+          result: 'invalid_result',
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return request(app.getHttpServer())
+        .post('/api/v1/ledger/events')
+        .send(dto)
+        .expect(400);
+    });
+
+    it('should reject event with invalid UUID format in tenantId', () => {
+      const payload = { action: 'test' };
+      const dto = {
+        type: 'LEDGER_EVENT',
+        actorType: 'user',
+        actorId: 'test-user',
+        subjectType: 'test',
+        subjectId: 'test-subject',
+        payload,
+        metadata: {
+          tenantId: 'not-a-valid-uuid',
+          requestId: 'req-1',
+          userAgent: 'test',
+          payloadHash: computeHash(payload),
+          result: 'accepted',
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return request(app.getHttpServer())
+        .post('/api/v1/ledger/events')
+        .send(dto)
+        .expect(400);
+    });
+
+    it('should reject event with invalid timestamp format', () => {
+      const payload = { action: 'test' };
+      const dto = {
+        type: 'LEDGER_EVENT',
+        actorType: 'user',
+        actorId: 'test-user',
+        subjectType: 'test',
+        subjectId: 'test-subject',
+        payload,
+        metadata: {
+          tenantId: '00000000-0000-0000-0000-000000000000',
+          requestId: 'req-1',
+          userAgent: 'test',
+          payloadHash: computeHash(payload),
+          result: 'accepted',
+          timestamp: 'not-a-timestamp',
+        },
+      };
+
+      return request(app.getHttpServer())
+        .post('/api/v1/ledger/events')
+        .send(dto)
+        .expect(400);
+    });
+
+    it('should reject DEVICE_LEDGER_EVENT without deviceId', () => {
+      const payload = { action: 'test' };
+      const dto = {
+        type: 'DEVICE_LEDGER_EVENT',
+        actorType: 'device',
+        actorId: 'device-1',
+        subjectType: 'test',
+        subjectId: 'test-subject',
+        // Missing deviceId and deviceType
+        payload,
+        metadata: {
+          tenantId: '00000000-0000-0000-0000-000000000000',
+          requestId: 'req-1',
+          userAgent: 'test',
+          payloadHash: computeHash(payload),
+          result: 'accepted',
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return request(app.getHttpServer())
+        .post('/api/v1/ledger/events')
+        .send(dto)
+        .expect(400);
+    });
+
+    it('should reject event with empty payload', () => {
+      const dto = {
+        type: 'LEDGER_EVENT',
+        actorType: 'user',
+        actorId: 'test-user',
+        subjectType: 'test',
+        subjectId: 'test-subject',
+        // payload is required
+        metadata: {
+          tenantId: '00000000-0000-0000-0000-000000000000',
+          requestId: 'req-1',
+          userAgent: 'test',
+          payloadHash: computeHash({}),
+          result: 'accepted',
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return request(app.getHttpServer())
+        .post('/api/v1/ledger/events')
+        .send(dto)
+        .expect(400);
+    });
+
+    it('should reject event with excessively large payload', () => {
+      const largePayload = {
+        data: 'x'.repeat(1000000), // 1MB of data
+      };
+      const dto = {
+        type: 'LEDGER_EVENT',
+        actorType: 'user',
+        actorId: 'test-user',
+        subjectType: 'test',
+        subjectId: 'test-subject',
+        payload: largePayload,
+        metadata: {
+          tenantId: '00000000-0000-0000-0000-000000000000',
+          requestId: 'req-1',
+          userAgent: 'test',
+          payloadHash: computeHash(largePayload),
+          result: 'accepted',
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return request(app.getHttpServer())
+        .post('/api/v1/ledger/events')
+        .send(dto)
+        .expect(413); // Payload Too Large
+    });
+
+    it('should handle concurrent event creation', async () => {
+      const payload1 = { action: 'concurrent-1', timestamp: Date.now() };
+      const payload2 = { action: 'concurrent-2', timestamp: Date.now() };
+      const payload3 = { action: 'concurrent-3', timestamp: Date.now() };
+
+      const dto1 = {
+        type: 'LEDGER_EVENT',
+        actorType: 'user',
+        actorId: 'concurrent-user-1',
+        subjectType: 'test',
+        subjectId: 'concurrent-1',
+        payload: payload1,
+        metadata: {
+          tenantId: '00000000-0000-0000-0000-000000000000',
+          requestId: 'concurrent-req-1',
+          userAgent: 'test',
+          payloadHash: computeHash(payload1),
+          result: 'accepted',
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      const dto2 = { ...dto1, actorId: 'concurrent-user-2', payload: payload2, 
+                     metadata: { ...dto1.metadata, requestId: 'concurrent-req-2', payloadHash: computeHash(payload2) } };
+      const dto3 = { ...dto1, actorId: 'concurrent-user-3', payload: payload3,
+                     metadata: { ...dto1.metadata, requestId: 'concurrent-req-3', payloadHash: computeHash(payload3) } };
+
+      // Create events concurrently
+      const results = await Promise.all([
+        request(app.getHttpServer()).post('/api/v1/ledger/events').send(dto1),
+        request(app.getHttpServer()).post('/api/v1/ledger/events').send(dto2),
+        request(app.getHttpServer()).post('/api/v1/ledger/events').send(dto3),
+      ]);
+
+      // All should succeed
+      results.forEach(res => {
+        expect(res.status).toBe(201);
+        expect(res.body).toHaveProperty('id');
+      });
+
+      // All IDs should be unique
+      const ids = results.map(r => r.body.id);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(3);
+    });
+
+    it('should validate GET request with invalid UUID format', () => {
+      return request(app.getHttpServer())
+        .get('/api/v1/ledger/events/not-a-valid-uuid')
+        .expect(500); // TypeORM throws error for invalid UUID
+    });
+
+    it('should handle GET request with SQL injection attempt', () => {
+      const sqlInjection = "1' OR '1'='1";
+      return request(app.getHttpServer())
+        .get(`/api/v1/ledger/events/${encodeURIComponent(sqlInjection)}`)
+        .expect(500); // Should be safely handled by TypeORM
+    });
+  });
+
+  describe('Performance and Load', () => {
+    it('should handle creating many events in sequence', async () => {
+      const eventCount = 20;
+      const startTime = Date.now();
+
+      for (let i = 0; i < eventCount; i++) {
+        const payload = { sequence: i, timestamp: Date.now() };
+        const dto = {
+          type: 'LEDGER_EVENT',
+          actorType: 'system',
+          actorId: 'load-test-system',
+          subjectType: 'load-test',
+          subjectId: `load-${i}`,
+          payload,
+          metadata: {
+            tenantId: '00000000-0000-0000-0000-000000000000',
+            requestId: `load-req-${i}`,
+            userAgent: 'load-test',
+            payloadHash: computeHash(payload),
+            result: 'accepted',
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        await request(app.getHttpServer())
+          .post('/api/v1/ledger/events')
+          .send(dto)
+          .expect(201);
+      }
+
+      const duration = Date.now() - startTime;
+      
+      // Should complete in reasonable time (< 10 seconds for 20 events)
+      expect(duration).toBeLessThan(10000);
+    });
+
+    it('should retrieve large event list efficiently', async () => {
+      const startTime = Date.now();
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/ledger/events')
+        .expect(200);
+
+      const duration = Date.now() - startTime;
+
+      // Should respond in under 1 second even with many events
+      expect(duration).toBeLessThan(1000);
+      expect(Array.isArray(response.body)).toBe(true);
+    });
+  });
 });
