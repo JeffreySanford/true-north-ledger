@@ -8,12 +8,13 @@ Purpose:
 
 - Responsive command center for administrators and operators.
 - Future adaptive routes for desktop, tablet, and mobile workflows.
-- Built with Angular, SCSS, routing, Vitest, and Playwright.
+- Built with Angular, SCSS, routing, guarded auth routes, Vitest, and Playwright.
+- Uses the shared frontend UX system for MD3 styles, Material Icons, reusable visual primitives, and reduced-motion-aware animations.
 
 Run:
 
 ```sh
-pnpm nx serve ledger-web
+pnpm start:web
 ```
 
 Build:
@@ -81,3 +82,5 @@ flowchart LR
 - `/m/*` - mobile scan, approve, alert, and proof flows.
 
 Role and surface-specific route access is defined in [RBAC and Role-Specific Views](../platform/rbac-and-views.md).
+
+Shared styling, gamification, and visual testing guidance is defined in [Frontend UX System](../development/frontend-ux-system.md).

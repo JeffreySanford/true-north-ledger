@@ -32,6 +32,8 @@ node_modules
 npm-debug.log
 yarn-error.log
 testem.log
+dev-*.log
+/nul
 /typings
 
 # System Files

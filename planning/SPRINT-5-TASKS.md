@@ -2,6 +2,7 @@
 
 **Sprint Duration:** 2 weeks (July 29 - August 11, 2026)  
 **Sprint Goal:** Enable real-time updates via WebSockets and deploy production-ready infrastructure with monitoring.
+**Status:** Planned (not started as of 2026-06-04)
 
 ---
 
@@ -17,6 +18,7 @@
 - [ ] Health check endpoints implemented
 - [ ] Production Docker Compose stack deployed
 - [ ] OpenAPI/Swagger documentation complete
+- [ ] Live operations UI shows connection state, event feed highlights, readiness score, and demo mode using shared visual primitives
 
 ---
 
@@ -178,6 +180,9 @@
   - [ ] Add clear all
 - [ ] Add notification sound (optional)
 - [ ] Add browser notifications API integration
+- [ ] Reuse shared connection status, ledger event card, status chip, and empty state components
+- [ ] Add event highlight animation with reduced-motion fallback
+- [ ] Add notification severity iconography through Material Icons
 
 ### Real-time Updates Integration
 - [ ] Update DashboardPage with real-time data
@@ -194,6 +199,8 @@
 - [ ] Update InventoryPage with scan updates
   - [ ] Subscribe to INVENTORY_SCANNED
   - [ ] Update inventory counts
+- [ ] Add live operations board showing system readiness, active connections, recent verified events, open anomalies, and device heartbeat health
+- [ ] Add PI demo mode seeded by real API state or approved fixtures, never hardcoded success states
 
 ### Reconnection Logic
 - [ ] Implement exponential backoff
@@ -217,6 +224,10 @@
   - [ ] Test notification list
   - [ ] Test mark as read
   - [ ] Test connection indicator
+  - [ ] Test connection status visual states for connected, connecting, reconnecting, disconnected, and failed
+  - [ ] Test live event feed highlight state with reduced-motion mode
+  - [ ] Test readiness score derives from API/WebSocket/ledger inputs
+  - [ ] Test demo mode uses approved API-backed fixtures instead of hardcoded success state
 
 ---
 
@@ -413,6 +424,11 @@
   - [ ] Subscribe to specific subject
   - [ ] Create various events
   - [ ] Verify only relevant received
+- [ ] Test connection status indicator renders connected, reconnecting, disconnected, and failed states
+- [ ] Test live event feed highlights new events without breaking reduced-motion mode
+- [ ] Test live operations board readiness score derives from API/WebSocket/ledger state
+- [ ] Test demo mode renders from real API state or approved fixtures and labels fixture-backed data clearly
+- [ ] Test live operations cards do not horizontally overflow or clip connection/readiness text on mobile, tablet, or desktop
 
 ### Production Infrastructure E2E
 - [ ] Test health endpoints
@@ -449,6 +465,7 @@
   - [ ] Restore procedures
   - [ ] Disaster recovery
 - [ ] Update README with production info
+- [ ] Document live operations visual state model, readiness score inputs, connection state labels, event highlight rules, and demo mode data policy
 
 ### API Documentation
 - [ ] Publish Swagger docs
@@ -490,14 +507,15 @@ A task is considered complete when:
 
 ## PI-1 Completion
 
-This sprint completes Program Increment 1. Final deliverables:
-✅ Complete authentication system
-✅ Device management and ingestion
-✅ Orders with full audit trail
-✅ Inventory with provenance
-✅ Real-time WebSocket notifications
-✅ Production infrastructure
-✅ Comprehensive monitoring
-✅ Complete API documentation
+This sprint is planned to complete Program Increment 1 with the following target deliverables:
+
+- [ ] Complete authentication system
+- [ ] Device management and ingestion
+- [ ] Orders with full audit trail
+- [ ] Inventory with provenance
+- [ ] Real-time WebSocket notifications
+- [ ] Production infrastructure
+- [ ] Comprehensive monitoring
+- [ ] Complete API documentation
 
 **Next PI Preview:** See PI-2 planning for advanced features (donations, anomaly detection, MQTT, mobile UI)

@@ -1,5 +1,6 @@
 import nx from '@nx/eslint-plugin';
 import baseConfig from '../../eslint.config.mjs';
+import noStandaloneComponent from '../../eslint-rules/no-standalone-component.mjs';
 
 export default [
   ...nx.configs['flat/angular'],
@@ -7,6 +8,13 @@ export default [
   ...baseConfig,
   {
     files: ['**/*.ts'],
+    plugins: {
+      tnl: {
+        rules: {
+          'no-standalone-component': noStandaloneComponent,
+        },
+      },
+    },
     rules: {
       '@angular-eslint/directive-selector': [
         'error',
@@ -24,9 +32,10 @@ export default [
           style: 'kebab-case',
         },
       ],
-      // Downgrade Angular best practice rules to warnings for Sprint 0
-      '@angular-eslint/prefer-standalone': 'warn',
+      // Disable standalone component encouragement and enforce NgModule pages.
+      '@angular-eslint/prefer-standalone': 'off',
       '@angular-eslint/prefer-inject': 'warn',
+      'tnl/no-standalone-component': 'error',
     },
   },
   {

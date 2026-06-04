@@ -1,8 +1,93 @@
-<section class="section-card">
+<section
+  class="section-card"
+  [@cardEnter]="{ value: 'enter', params: motionTimings }"
+>
   <h1 class="page-heading">Dashboard</h1>
+  @if (currentUser$ | async; as user) {
+    <div
+      class="dashboard-role-state"
+      data-testid="dashboard-role-state"
+      [@expandCollapse]="{ value: 'expanded', params: motionTimings }"
+    >
+      <span
+        class="dashboard-role-icon"
+        data-testid="role-aware-icon"
+        [attr.aria-label]="'Role icon: ' + roleIconName(user)"
+        [@statusPulse]="{ value: 'active', params: motionTimings }"
+      >
+        {{ roleIconGlyph(user) }}
+      </span>
+      <tnl-status-chip label="Role profile" [stateText]="roleLabel(user)" tone="info" />
+    </div>
+
+    <tnl-mission-card
+      [icon]="roleIconName(user)"
+      title="Verify your first ledger event"
+      description="Review chain verification once server-backed onboarding state is available."
+      [state]="missionState(user)"
+      [sourceText]="missionSourceText(user)"
+    />
+  } @else {
+    <tnl-mission-card
+      icon="task"
+      title="Verify your first ledger event"
+      description="Review chain verification once server-backed onboarding state is available."
+      state="pending"
+      sourceText="Waiting for authenticated server state"
+    />
+  }
+  <div class="dashboard-status" data-testid="dashboard-visual-primitives">
+    <tnl-status-chip label="Ledger chain" stateText="Ready for verification" tone="info" />
+    <tnl-trust-seal label="Audit posture" state="pending" />
+    <tnl-severity-chip level="warning" message="Role setup incomplete" />
+    <tnl-connection-status label="API" state="connected" detail="Development API readiness placeholder" />
+  </div>
   <p>
     Welcome to True North Ledger. This dashboard shell is the first step toward
     a contract-driven ledger platform with shared schema validation across UI,
     API, and storage.
   </p>
 </section>
+
+<tnl-progress-rail
+  title="Auth setup progress"
+  [steps]="[
+    { label: 'Login created', state: 'complete' },
+    { label: 'Secure shell visuals added', state: 'complete' },
+    { label: 'Roles seeded', state: 'pending' }
+  ]"
+/>
+
+<tnl-proof-hash-card
+  label="Latest proof hash"
+  algorithm="SHA-256"
+  hash="7f0a62e4a4b90897f8f6b2f84ec2f09ab2172d4fd8d2e6db95b8c1d4f0f1a123"
+  state="verified"
+/>
+
+<tnl-timeline-rail
+  title="Auth rollout timeline"
+  [entries]="[
+    { title: 'JWT guard baseline', timestamp: 'Day 1', state: 'done' },
+    { title: 'Permission audit events', timestamp: 'Day 4', state: 'done' },
+    { title: 'Role catalog seeding', timestamp: 'Next', state: 'current' },
+    { title: 'Cross-tenant lockout verification', timestamp: 'Upcoming', state: 'upcoming' }
+  ]"
+/>
+
+  <div [@eventHighlight]="{ value: (currentUser$ | async)?.userId ?? 'guest', params: motionTimings }">
+    <tnl-ledger-event-card
+      eventType="LOGIN_SUCCESS"
+      actor="admin"
+      subject="session"
+      hash="pending-server-ledger-hash"
+      timestamp="Fixture until live ledger events are loaded"
+      result="accepted"
+    />
+  </div>
+
+<tnl-empty-state
+  icon="task_alt"
+  title="Mission onboarding pending"
+  message="Server-backed setup missions will appear here after role and onboarding state are available."
+/>

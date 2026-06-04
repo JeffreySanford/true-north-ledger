@@ -73,7 +73,7 @@ if (!existsSync(composeFile)) {
 }
 
 if (existsSync(localEnvFile)) {
-  config({ path: localEnvFile });
+  config({ path: localEnvFile, quiet: true });
 }
 
 const states = containers.map(({ name, service }) => ({

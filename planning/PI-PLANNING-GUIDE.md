@@ -8,6 +8,11 @@ This repository contains three levels of planning documentation:
 2. **SPRINT-X-TASKS.md** - Individual sprint task breakdowns (2 weeks each)
 3. **Daily standups** - Track progress using checkbox updates
 
+Related PI addenda and supporting docs:
+
+- **PI-1-GAMIFICATION-VISUAL-APPEAL.md** - shared gamification, MD3, visual appeal, and animation plan.
+- **documentation/development/frontend-ux-system.md** - shared frontend UX system, style budget rules, and visual testing expectations.
+
 ---
 
 ## How to Track Progress
@@ -170,6 +175,7 @@ Track this across sprints to improve estimation.
 - Bug count (critical, high, medium, low)
 - Code review feedback volume
 - E2E test pass rate
+- Shared visual primitive coverage for state variants and reduced-motion behavior
 
 ### PI Health Metrics
 ```

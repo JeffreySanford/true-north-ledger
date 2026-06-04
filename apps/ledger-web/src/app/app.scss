@@ -3,3 +3,44 @@
   color: var(--tnl-color-on-background);
   font-family: var(--tnl-font-family);
 }
+
+.user-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tnl-space-2);
+  min-height: 2.5rem;
+  font-weight: 700;
+}
+
+.avatar,
+.session-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  border: 1px solid color-mix(in srgb, var(--tnl-color-inverse-on-surface), transparent 72%);
+}
+
+.avatar {
+  width: 2rem;
+  border-radius: var(--tnl-radius-full);
+  background: var(--tnl-color-primary-container);
+  color: var(--tnl-color-on-primary-container);
+  font-size: 0.75rem;
+  letter-spacing: 0;
+}
+
+.session-chip {
+  gap: var(--tnl-space-2);
+  padding: 0 var(--tnl-space-3);
+  border-radius: var(--tnl-radius-full);
+  color: var(--tnl-color-inverse-on-surface);
+  font-size: 0.8125rem;
+}
+
+.session-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--tnl-radius-full);
+  background: var(--tnl-color-primary-container);
+}

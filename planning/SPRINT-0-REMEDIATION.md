@@ -42,6 +42,14 @@
 - ⏳ Add a real login/session flow in Sprint 1; no committed frontend token fallback remains
 - ⏳ Continue reducing lint/build warnings during normal feature work
 
+### PI-1 Visual Planning Baseline:
+- ✅ Trust-first command-center experience model documented
+- ✅ Severity/status vocabulary direction documented
+- ✅ Accessibility guardrails documented for non-color state, reduced motion, high contrast, and responsive visual checks
+- ✅ Shared MD3/style/component budget documented
+- ✅ Gamification rule documented: badges, seals, missions, and scores must derive from API, permission, or ledger state
+- ⏳ Reusable visual components and animation triggers move to Sprint 1 implementation
+
 ---
 
 ## Executive Summary

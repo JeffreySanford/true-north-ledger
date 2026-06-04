@@ -1,5 +1,5 @@
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from './jwt.strategy';
+import type { JwtPayload } from './auth.dto';
 import { requiredEnv } from '../config/required-env';
 
 /**
@@ -16,7 +16,8 @@ export function createTestJwtToken(
     sub: 'test-user-123',
     actorType: 'user',
     tenantId: '00000000-0000-0000-0000-000000000000',
-    permissions: ['read', 'write'],
+    permissions: ['ledger.read', 'ledger.write'],
+    tokenType: 'access',
     ...payload,
   };
 
@@ -54,7 +55,7 @@ export const testTokens = {
     sub: 'test-auditor-321',
     actorType: 'user',
     tenantId: TEST_TENANT_ID,
-    permissions: ['read', 'audit'],
+    permissions: ['ledger.read', 'ledger.audit'],
   }),
   differentTenant: () => createTestJwtToken({
     sub: 'other-user',

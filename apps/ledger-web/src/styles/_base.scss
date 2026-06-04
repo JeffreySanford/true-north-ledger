@@ -29,3 +29,27 @@ select {
   outline: 3px solid color-mix(in srgb, var(--tnl-color-focus-ring), transparent 35%);
   outline-offset: 2px;
 }
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+
+  .section-card,
+  .tnl-status-chip,
+  .tnl-trust-seal,
+  .tnl-severity-chip,
+  .tnl-connection-status,
+  .tnl-mission-card,
+  .tnl-progress-rail,
+  .tnl-ledger-event-card,
+  .tnl-empty-state {
+    border: 1px solid CanvasText;
+  }
+
+  a,
+  button {
+    text-decoration: underline;
+  }
+}

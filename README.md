@@ -8,13 +8,13 @@ The product goal is simple: every actor has an identity, and every meaningful ac
 
 This repository is an Nx workspace using pnpm.
 
-**Current Status:** Sprint 0 remediation complete; Sprint 1 product auth work next
+**Current Status:** Sprint 0 remediation and Sprint 1 authentication/RBAC foundation are complete. PI-1 is moving into Sprint 2 device-management delivery.
 
 Implemented now:
 
 - `apps/ledger-web` - Angular web application with routing, SCSS, Vitest, and Playwright
-- `apps/ledger-web-e2e` - Playwright e2e project with 145 browser quality and full-stack JWT checks
-- `apps/ledger-api` - NestJS REST API with PostgreSQL persistence, authenticated ledger events, and Swagger/OpenAPI docs
+- `apps/ledger-web-e2e` - Playwright e2e project with browser quality, login, permission, and full-stack JWT checks
+- `apps/ledger-api` - NestJS REST API with PostgreSQL persistence, authenticated ledger events, auth endpoints, and Swagger/OpenAPI docs
 - `libs/shared-models` - Unified contract library exports
 - `libs/ledger-contracts` - Core Zod schemas for ledger events and metadata
 - `libs/auth-contracts` - Actor type and permission schemas  
@@ -23,17 +23,15 @@ Implemented now:
 - Docker Compose infrastructure (PostgreSQL, Redis, PgAdmin)
 
 **Test Status:**
-- Backend: 42 tests passing
-- Frontend: 4 tests passing
-- E2E: 145 Playwright tests passing across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
+- Backend test suites passing
+- Frontend unit tests passing
+- E2E Playwright suites passing across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
 - Lint/build/audit: passing cleanly
 
 **Remaining Product Gaps:**
-1. Sprint 1 still needs real login/logout/session UX.
-2. Frontend still needs product login/session UX; no token fallback is committed.
-3. Device/service token provisioning and rotation are not productized yet.
-4. Orders, inventory, public proofs, WebSockets, and production monitoring are planned PI-1 work.
-5. Sprint 1 should keep the quality gates clean while adding product authentication.
+1. Sprint 2 device registration, authentication, heartbeat, and revocation flows are planned next.
+2. Orders, inventory, public proofs, WebSockets, and production monitoring remain PI-1 roadmap work.
+3. Browser auth can move from storage-backed bearer tokens toward secure cookie sessions when API/client constraints allow.
 
 **Architecture:**
 - Schema-driven contracts with Zod validation across frontend and API
@@ -42,6 +40,8 @@ Implemented now:
 - SHA-256 payload and event hash generation
 - Previous-hash ledger chain linkage
 - JWT, tenant, permission, and rate-limit guards on ledger endpoints
+- Initial login/logout/refresh flow, guarded Angular routes, and permission-aware navigation
+- Shared SCSS foundation in `apps/ledger-web/src/styles.scss` and `apps/ledger-web/src/styles/`
 - Runtime secrets are loaded from ignored `.env.development` / `.env.production` files or deployment secret stores; `.env.example` is placeholder-only
 - Swagger UI at `http://localhost:3000/api/docs`
 - Docker Compose development environment
@@ -161,9 +161,66 @@ Test all:
 pnpm nx run-many -t test
 ```
 
+## Authentication Setup
+
+### Required Auth Environment Variables
+
+Runtime secrets are loaded from `.env.development` (local) and `.env.production` (deployment).
+
+Set at minimum:
+
+- `JWT_SECRET` strong signing secret for access and refresh JWTs
+- `AUTH_USERNAME` seeded admin username for Sprint 1 bootstrap
+- `AUTH_PASSWORD` seeded admin password for Sprint 1 bootstrap
+- `AUTH_TENANT_ID` default tenant UUID for seeded auth workflows
+- `JWT_EXPIRATION` access token TTL (example: `1h`)
+- `JWT_REFRESH_EXPIRATION` refresh token TTL (example: `7d`)
+
+Use `.env.example` as a template and provide real values through local ignored env files or deployment secret stores.
+
+### Login Flow
+
+1. Start API and web app.
+2. Open `http://localhost:4200/login`.
+3. Sign in with configured bootstrap credentials.
+4. Confirm redirect to dashboard and permission-aware navigation.
+
+Frontend implementation details are documented in [Frontend Login Flow Guide](documentation/development/frontend-login-flow.md).
+
+### Service Token Setup
+
+Use admin login first, then create service tokens via:
+
+- `POST /api/v1/auth/service-token`
+- `DELETE /api/v1/auth/service-token/:id`
+
+See [Service Token Management](documentation/platform/service-token-management.md) for scope, rotation, and revocation guidance.
+Partner onboarding examples are documented in [Service Token Integration Guide for Partners](documentation/platform/service-token-integration-guide.md).
+
+## Auth Testing Instructions
+
+Run auth-related backend tests:
+
+```sh
+pnpm nx test ledger-api -- --runTestsByPath src/app/auth/auth.integration.spec.ts
+pnpm nx test ledger-api -- --runTestsByPath src/app/ledger-events/ledger-events.integration.spec.ts
+```
+
+Run frontend auth unit tests:
+
+```sh
+pnpm nx test ledger-web
+```
+
+Run auth-focused e2e flows:
+
+```sh
+pnpm nx e2e ledger-web-e2e -- --grep "login|refresh|unauthorized|permission"
+```
+
 ## Project Planning & Roadmap
 
-**Current Phase:** Sprint 0 Complete - Ready for PI-1/Sprint 1
+**Current Phase:** PI-1 / Sprint 1 in progress
 
 ### Planning Documents
 
@@ -184,6 +241,7 @@ All planning documents are located in the [`planning/`](planning/) folder:
   - [Sprint 5 Tasks](planning/SPRINT-5-TASKS.md) - WebSocket Notifications & Production
 
 - **[Current State Assessment](planning/CURRENT-STATE.md)** - What's done vs. what's planned
+- **[PI-1 Gamification & Visual Appeal](planning/PI-1-GAMIFICATION-VISUAL-APPEAL.md)** - MD3, shared UX primitives, animations, and gamification plan
 - **[PI Planning Guide](planning/PI-PLANNING-GUIDE.md)** - How to use the planning documents
 
 ### What's Next (PI-1 Goals)
@@ -197,6 +255,7 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 - Real-time WebSocket notifications
 - Production infrastructure with monitoring
 - Public proof verification system
+- Shared visual system with reusable MD3 components, accessible animations, and E2E coverage for visual states
 - Expanded OpenAPI/Swagger documentation
 
 ## Documentation
@@ -204,6 +263,7 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 ### Architecture & Design
 
 - [Documentation Index](documentation/README.md)
+- [Product Brief](documentation/overview/product-brief.md)
 - [Project Overview](documentation/overview/project-overview.md)
 - [Architecture](documentation/architecture/architecture.md)
 - [Applications](documentation/operations/applications.md)
@@ -213,20 +273,32 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 - [Device Ingestion](documentation/platform/device-ingestion.md)
 - [Security Model](documentation/platform/security-model.md)
 - [RBAC and Role-Specific Views](documentation/platform/rbac-and-views.md)
+- [Service Token Management](documentation/platform/service-token-management.md)
+- [Rate Limiting Configuration](documentation/platform/rate-limiting-configuration.md)
+- [Auth Troubleshooting](documentation/platform/auth-troubleshooting.md)
+- [Permission Configuration](documentation/platform/permission-configuration.md)
 - [Data Model](documentation/architecture/data-model.md)
 - [Infrastructure](documentation/operations/infrastructure.md)
 
 ### Development Guides
 
 - [Development Workflow](documentation/development/development-workflow.md)
+- [Getting Started with Authentication](documentation/development/getting-started-authentication.md)
+- [Frontend Login Flow Guide](documentation/development/frontend-login-flow.md)
 - [Testing and Quality Gates](documentation/development/testing-quality-gates.md)
 - [Coding Standards](documentation/development/coding-standards.md)
+- [Frontend UX System](documentation/development/frontend-ux-system.md)
+
+### Integration Guides
+
+- [Service Token Integration Guide for Partners](documentation/platform/service-token-integration-guide.md)
 
 ### Planning & Roadmap
 
 All planning documents are in the [`planning/`](planning/) folder:
 
 - [PI-1 Planning](planning/PI-1-PLANNING.md) - Overall program increment plan
+- [PI-1 Gamification & Visual Appeal](planning/PI-1-GAMIFICATION-VISUAL-APPEAL.md) - UX/gamification addendum
 - [Sprint Task Documents](planning/) - Detailed sprint breakdowns (Sprints 1-5)
 - [Current State Assessment](planning/CURRENT-STATE.md) - Progress tracking
 - [PI Planning Guide](planning/PI-PLANNING-GUIDE.md) - How to use planning docs

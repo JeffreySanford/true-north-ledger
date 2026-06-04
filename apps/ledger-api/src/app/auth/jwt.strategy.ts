@@ -2,17 +2,12 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { requiredEnv } from '../config/required-env';
-
-export interface JwtPayload {
-  sub: string; // user/service/device ID
-  actorType: 'user' | 'service' | 'device' | 'system';
-  tenantId: string;
-  permissions?: string[];
-}
+import { JwtPayload } from './auth.dto';
+import { TokenBlacklistService } from './token-blacklist.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly tokenBlacklistService: TokenBlacklistService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -21,13 +16,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    if (!payload.sub || !payload.actorType || !payload.tenantId) {
+    if (!payload.sub || !payload.actorType || !payload.tenantId || payload.tokenType !== 'access') {
       throw new UnauthorizedException('Invalid token payload');
     }
+
+    if (payload.jti && (await this.tokenBlacklistService.isJtiBlacklisted(payload.jti))) {
+      throw new UnauthorizedException('Token revoked');
+    }
+
     return {
       userId: payload.sub,
+      username: payload.username ?? payload.sub,
       actorType: payload.actorType,
       tenantId: payload.tenantId,
+      roles: payload.roles || [],
       permissions: payload.permissions || [],
     };
   }

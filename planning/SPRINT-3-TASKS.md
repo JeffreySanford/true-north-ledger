@@ -2,6 +2,7 @@
 
 **Sprint Duration:** 2 weeks (July 1 - July 14, 2026)  
 **Sprint Goal:** Implement order lifecycle management with full ledger audit trail and proof generation.
+**Status:** Planned (not started as of 2026-06-04)
 
 ---
 
@@ -10,6 +11,7 @@
 - [ ] Orders can be created with proper validation
 - [ ] Order status changes create ledger events
 - [ ] Order history fully auditable via ledger
+- [ ] Order UI includes lifecycle milestone visuals and proof status indicators
 - [ ] Order proofs generated for verification
 - [ ] Correlation IDs link related order events
 - [ ] Order list and detail views functional in UI
@@ -292,6 +294,8 @@
 - [ ] Display correlation ID for debugging
 - [ ] Show proof download button
 - [ ] Add print order button
+- [ ] Show order completeness rail for customer, items, address, review, and proof readiness
+- [ ] Show milestone badges derived from server order and ledger state
 
 ### Order Timeline Component
 - [ ] Create order-timeline.component.ts
@@ -304,6 +308,9 @@
 - [ ] Highlight current status
 - [ ] Show visual timeline with connecting lines
 - [ ] Add expand/collapse details
+- [ ] Reuse shared timeline rail, status chip, trust seal, and event card primitives
+- [ ] Add Angular animation trigger for timeline item entry with reduced-motion fallback
+- [ ] Add unit tests for lifecycle rail, milestone badges, reduced-motion behavior, and no color-only status state
 
 ### Order Proof View
 - [ ] Create order-proof.component.ts
@@ -313,6 +320,8 @@
 - [ ] Add download proof button
 - [ ] Add verify proof button
 - [ ] Display verification result
+- [ ] Reuse shared proof hash card and proof verification trust seal
+- [ ] Add unit tests for verified, failed, pending, empty, loading, and error proof states
 
 ### UI Integration
 - [ ] Update navigation to highlight orders page
@@ -410,6 +419,14 @@
   - [ ] Verify chronological order
   - [ ] Verify current status highlighted
 
+### Order Visual E2E Tests
+- [ ] Test lifecycle rail displays every status transition with accessible labels
+- [ ] Test proof hash card renders verified, failed, and pending states
+- [ ] Test milestone badges derive from order and ledger state, not static client assumptions
+- [ ] Test order cards and timeline remain readable on mobile, tablet, and desktop
+- [ ] Test order completeness rail updates from server-backed form/detail state
+- [ ] Test order timeline and proof animations remain usable with reduced motion enabled
+
 ---
 
 ## Documentation
@@ -421,6 +438,7 @@
 - [ ] Create correlation ID usage guide
 - [ ] Document order search capabilities
 - [ ] Add order API workflow diagrams
+- [ ] Document order lifecycle rail, completeness rail, milestone badge, and proof indicator state model
 
 ### Integration Guides
 - [ ] Create "Order Management Quick Start" guide

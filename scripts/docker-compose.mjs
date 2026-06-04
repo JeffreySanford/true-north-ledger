@@ -8,7 +8,7 @@ const localEnvFile = '.env.development';
 const args = process.argv.slice(2);
 
 if (existsSync(localEnvFile)) {
-  config({ path: localEnvFile });
+  config({ path: localEnvFile, quiet: true });
 }
 
 function run(command, commandArgs) {

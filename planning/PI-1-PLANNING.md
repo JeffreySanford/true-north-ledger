@@ -20,6 +20,8 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] WebSocket notifications deliver real-time updates to connected clients
 - [ ] Public proof pages verify events without exposing private data
 - [ ] E2E tests validate critical workflows across frontend and API
+- [ ] Shared MD3 styles, Material Icons, reusable UX components, and animation primitives are used for all new visual work
+- [ ] E2E tests validate visual states, reduced-motion behavior, and permission-aware navigation for new UI elements
 - [ ] Production-ready Docker Compose infrastructure deployed with monitoring
 - [ ] API documentation (OpenAPI/Swagger) published and accessible
 
@@ -31,6 +33,16 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - Zero critical security vulnerabilities
 - All ledger events include complete audit metadata
 - 100% of write operations create auditable ledger events
+- New UI polish reuses shared `styles.scss`, `styles/` partials, and shared Angular components instead of page-specific CSS duplication
+
+```mermaid
+flowchart LR
+  S0[Sprint 0\nSecurity baseline] --> S1[Sprint 1\nAuth + MD3 foundation]
+  S1 --> S2[Sprint 2\nDevice fleet UX]
+  S2 --> S3[Sprint 3\nOrder lifecycle UX]
+  S3 --> S4[Sprint 4\nInventory provenance UX]
+  S4 --> S5[Sprint 5\nLive operations UX]
+```
 
 ---
 
@@ -40,53 +52,33 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 
 ### Sprint Acceptance Criteria
 
-- [ ] JWT-based authentication working for `user` actors
-- [ ] Service token authentication implemented
-- [ ] Permission guard system operational across all endpoints
-- [ ] Auth-related ledger events captured (login, logout, permission denied)
-- [ ] Rate limiting active on all public endpoints
-- [ ] Integration tests validate auth flows and permission enforcement
+- [x] JWT-based authentication working for `user` actors
+- [x] Service token authentication implemented
+- [x] Permission guard system operational across all endpoints
+- [x] Auth-related ledger events captured (login, logout, permission denied)
+- [x] Rate limiting active on all public endpoints
+- [x] Integration tests validate auth flows and permission enforcement
+- [x] Secure auth UX and role-aware navigation are implemented in the web shell
 
-### Tasks
+### Visual & Experience Work
 
-#### Backend Authentication
-- [ ] Create `auth` module in ledger-api
-- [ ] Implement JWT strategy with NestJS Passport
-- [ ] Create `AuthController` with login/logout endpoints
-- [ ] Build `JwtAuthGuard` for protected routes
-- [ ] Create `PermissionsGuard` using actor type and permission scopes
-- [ ] Add service token validation strategy
-- [ ] Implement rate limiting middleware (Redis-backed)
-- [ ] Create auth-related ledger event types (LOGIN_SUCCESS, LOGIN_FAILED, PERMISSION_DENIED)
-- [ ] Add tenant isolation to all database queries
-- [ ] Write behavior-focused unit tests for auth service
-- [ ] Write integration tests for auth endpoints
-- [ ] Add OpenAPI decorators to auth endpoints
+- [x] Establish Angular Material 3 theme tokens and shared SCSS design system
+- [x] Add Material Icons registry and UX iconography for audit, device, order, proof, and status states
+- [x] Add route transition animation foundation and reduced-motion accessibility support
+- [x] Define gamification principles that reward accuracy, completeness, and verified audit behavior
+- [x] Create shared UX primitives for status chips, severity chips, trust seals, mission cards, progress rails, event cards, proof hash cards, connection status, empty states, and timelines
+- [x] Keep reusable MD3 overrides in `apps/ledger-web/src/styles/_material.scss` and reusable app styles in `apps/ledger-web/src/styles/_components.scss`
+- [x] Add E2E coverage for auth UX, secure nav, and permission-based route visibility
 
-#### Contract Updates
-- [ ] Extend auth-contracts with JWT payload schema
-- [ ] Add service token schema validation
-- [ ] Create permission decorator schemas
-- [ ] Add auth request/response Zod schemas
+### Sprint 1 Delivery Status
 
-#### Frontend Integration
-- [ ] Create `AuthService` in ledger-web
-- [ ] Build login page component
-- [ ] Implement JWT storage and refresh logic
-- [ ] Add HTTP interceptor for auth headers
-- [ ] Create auth guard for protected routes
-- [ ] Build logout functionality
-- [ ] Add auth state management (signals/observables)
-- [ ] Add role-aware navigation and route guards for web/tablet/mobile surfaces
-- [ ] Write unit tests for auth service
-
-#### Testing & Documentation
-- [ ] E2E tests: successful login flow
-- [ ] E2E tests: failed login attempts create audit events
-- [ ] E2E tests: protected routes redirect unauthenticated users
-- [ ] E2E tests: permission-based route access
-- [ ] Document authentication flows in README
-- [ ] Create API authentication guide in documentation/
+- Sprint 1 execution details and completion tracking are maintained in `planning/SPRINT-1-TASKS.md`.
+- Documentation deliverables completed in Sprint 1 now include:
+  - `documentation/development/getting-started-authentication.md`
+  - `documentation/development/frontend-login-flow.md`
+  - `documentation/platform/auth-api-reference.md`
+  - `documentation/platform/service-token-management.md`
+  - `documentation/platform/service-token-integration-guide.md`
 
 ---
 
@@ -103,6 +95,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Device revocation immediately blocks access
 - [ ] Nonce validation prevents replay attacks
 - [ ] Device status visible in admin UI
+- [ ] Device fleet visual states, heartbeat indicators, and reliability seals use shared visual primitives
 
 ### Tasks
 
@@ -139,12 +132,21 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Add device event stream view
 - [ ] Write unit tests for device service
 
+#### Visual & Experience Work
+- [ ] Add device fleet command board using shared MD3 surfaces
+- [ ] Use shared status chip, severity chip, trust seal, mission card, and empty state components
+- [ ] Add device type iconography with accessible labels or adjacent text
+- [ ] Add heartbeat sparkline or compact recency visual with timestamp text
+- [ ] Add reliability seal derived from server heartbeat and revocation state
+- [ ] Add unit tests for online, offline, suspended, revoked, empty, loading, and error visual states
+
 #### Testing & Documentation
 - [ ] E2E tests: device registration flow
 - [ ] E2E tests: device authentication and event submission
 - [ ] E2E tests: revoked devices cannot submit events
 - [ ] E2E tests: batch device events processed correctly
 - [ ] E2E tests: nonce replay protection works
+- [ ] E2E tests: device fleet board visual states and heartbeat indicators do not rely on color alone
 - [ ] Document device registration flow
 - [ ] Create device integration guide for hardware partners
 
@@ -163,6 +165,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Correlation IDs link related order events
 - [ ] Order list and detail views functional in UI
 - [ ] Integration tests validate order workflows
+- [ ] Order lifecycle rail, milestone badges, and proof indicators derive from order and ledger state
 
 ### Tasks
 
@@ -198,12 +201,21 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Add order proof view/download
 - [ ] Write unit tests for order service
 
+#### Visual & Experience Work
+- [ ] Add order lifecycle rail and milestone badges
+- [ ] Add order completeness rail for customer, items, address, review, and proof readiness
+- [ ] Reuse shared timeline rail, status chip, trust seal, event card, and proof hash card components
+- [ ] Add proof verified, failed, and pending visual states with non-color labels
+- [ ] Add reduced-motion fallback for order timeline and proof confirmation animations
+- [ ] Add unit tests for lifecycle, proof, empty, loading, and error visual states
+
 #### Testing & Documentation
 - [ ] E2E tests: create order workflow
 - [ ] E2E tests: order status updates create ledger events
 - [ ] E2E tests: order cancellation workflow
 - [ ] E2E tests: order proof generation and verification
 - [ ] E2E tests: order search and filtering
+- [ ] E2E tests: order lifecycle rail, milestone badges, and proof indicators are accessible and responsive
 - [ ] Document order API workflows
 - [ ] Create order integration guide for partners
 
@@ -222,6 +234,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Inventory alerts for low stock/anomalies
 - [ ] Inventory dashboard shows real-time status
 - [ ] Integration with device events for automated tracking
+- [ ] Inventory provenance timeline, scan feedback, anomaly cards, and inventory health visuals use shared visual primitives
 
 ### Tasks
 
@@ -258,12 +271,21 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Add provenance visualization
 - [ ] Write unit tests for inventory service
 
+#### Visual & Experience Work
+- [ ] Add provenance timeline with actor, movement, location, quantity, and anomaly labels
+- [ ] Add scan accepted/rejected feedback with reduced-motion fallback
+- [ ] Add anomaly cards using shared severity chip and status chip styles
+- [ ] Add inventory health visuals for low stock, expiring soon, damaged, reserved, and removed states
+- [ ] Reuse shared timeline rail, ledger event card, trust seal, status chip, severity chip, and empty state components
+- [ ] Add unit tests for provenance, scan, anomaly, empty, loading, and error visual states
+
 #### Testing & Documentation
 - [ ] E2E tests: add inventory workflow
 - [ ] E2E tests: reserve/move inventory operations
 - [ ] E2E tests: device scan updates inventory
 - [ ] E2E tests: provenance trace shows complete history
 - [ ] E2E tests: inventory anomalies detected
+- [ ] E2E tests: provenance timeline, scan feedback, and anomaly cards remain readable without motion or color-only cues
 - [ ] Document inventory tracking workflows
 - [ ] Create inventory integration guide
 
@@ -284,6 +306,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Production environment variables configured
 - [ ] Health check endpoints implemented
 - [ ] Production Docker Compose stack deployed
+- [ ] Live operations UI shows connection state, event highlights, readiness score, and demo mode using shared visual primitives
 
 ### Tasks
 
@@ -309,6 +332,14 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] Add connection status indicator
 - [ ] Implement reconnection logic
 - [ ] Write unit tests for notification service
+
+#### Visual & Experience Work
+- [ ] Add connection status component states for connected, connecting, reconnecting, disconnected, and failed
+- [ ] Add live event feed highlights using reduced-motion-aware animation
+- [ ] Add live operations board with system readiness score, active connections, recent verified events, open anomalies, and heartbeat health
+- [ ] Add PI demo mode seeded by real API state or approved fixtures, never hardcoded success states
+- [ ] Reuse shared connection status, ledger event card, status chip, severity chip, progress rail, and empty state components
+- [ ] Add unit tests for connection, event-feed, readiness, demo, empty, loading, and error visual states
 
 #### Infrastructure & Monitoring
 - [ ] Create production docker-compose.yml
@@ -337,6 +368,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - [ ] E2E tests: real-time notifications delivered correctly
 - [ ] E2E tests: subscription filtering works
 - [ ] E2E tests: reconnection after disconnect
+- [ ] E2E tests: live feed, connection status, readiness score, and demo mode derive from API/WebSocket/ledger state
 - [ ] Load tests: API under concurrent users
 - [ ] Load tests: WebSocket concurrent connections
 - [ ] Document WebSocket integration guide
@@ -380,6 +412,7 @@ Build the foundational platform capabilities that enable secure multi-actor oper
 - Prove ledger audit trail completeness
 - Display public proof verification
 - Showcase monitoring dashboards
+- Showcase shared visual system reuse across auth, devices, orders, inventory, proofs, and live operations
 
 ### Retrospective Focus Areas
 - Test coverage and quality gate effectiveness

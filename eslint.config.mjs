@@ -1,4 +1,5 @@
 import nx from '@nx/eslint-plugin';
+import standalonePlugin from './eslint-plugin-standalone.mjs';
 
 export default [
   ...nx.configs['flat/base'],
@@ -36,7 +37,9 @@ export default [
       '**/*.cjs',
       '**/*.mjs',
     ],
-    // Override or add rules here
+    plugins: {
+      standalone: standalonePlugin,
+    },
     rules: {
       'no-restricted-imports': [
         'error',
@@ -49,6 +52,26 @@ export default [
                 'Expose and test Observable streams directly. Promise conversion requires an explicit architecture exception.',
             },
           ],
+        },
+      ],
+      'standalone/require-standalone-false': 'error',
+    },
+  },
+  {
+    files: ['apps/ledger-api/src/app/**/*.ts'],
+    ignores: ['**/*.spec.ts', 'apps/ledger-api/src/app/migrations/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'FunctionDeclaration[async=true]',
+          message:
+            'Avoid async methods in backend application code. Use cold Observable<T> return types and isolate Promise-based boundaries explicitly.',
+        },
+        {
+          selector: 'MethodDefinition[kind="method"][value.async=true]',
+          message:
+            'Avoid async methods in backend application code. Use cold Observable<T> return types and isolate Promise-based boundaries explicitly.',
         },
       ],
     },

@@ -2,6 +2,7 @@
 
 **Sprint Duration:** 2 weeks (June 17 - June 30, 2026)  
 **Sprint Goal:** Enable device registration, authentication, and event ingestion with proper identity and audit trails.
+**Status:** Planned (not started as of 2026-06-04)
 
 ---
 
@@ -11,6 +12,7 @@
 - [ ] Device authentication validates device tokens
 - [ ] Device heartbeat endpoint tracks online/offline status
 - [ ] Device events create ledger entries with device actor context
+- [ ] Device dashboard includes status icons and heartbeat visual indicators
 - [ ] Device revocation immediately blocks access
 - [ ] Nonce validation prevents replay attacks
 - [ ] Device status visible in admin UI
@@ -228,7 +230,7 @@
 - [ ] Add device status observable (online/offline)
 
 ### Device Registry Page
-- [ ] Create devices-registry.page.ts component
+- [ ] Expand existing `/devices` route module into a full device registry page
 - [ ] Build device list table
   - [ ] Display device name, type, status, last seen
   - [ ] Show online/offline indicator (green/gray)
@@ -278,6 +280,10 @@
 - [ ] Add device count badges (online/total)
 - [ ] Create device online/offline visual indicators
 - [ ] Add device icons for different types
+- [ ] Reuse shared status chip, severity chip, trust seal, mission card, and empty state components from Sprint 1
+- [ ] Add device fleet command board using shared MD3 surfaces and style tokens
+- [ ] Add heartbeat sparkline or compact recency visual that includes non-color status text
+- [ ] Add reliability seal derived from server heartbeat/revocation state
 - [ ] Implement real-time status updates (if WebSocket ready)
 
 ### Unit Tests
@@ -292,6 +298,8 @@
   - [ ] Test registration form validation
   - [ ] Test device detail display
   - [ ] Test status updates
+  - [ ] Test device fleet visual states for online, offline, suspended, revoked, empty, loading, and error
+  - [ ] Test heartbeat visual exposes timestamp text and non-color status text
 - [ ] Device form tests
   - [ ] Test input validation
   - [ ] Test API key display
@@ -345,6 +353,13 @@
   - [ ] Navigate to ledger events
   - [ ] Verify all device events visible
 
+### Device Visual E2E Tests
+- [ ] Test device fleet board renders online, offline, suspended, and revoked visual states
+- [ ] Test heartbeat visual includes timestamp text and does not rely on color alone
+- [ ] Test device icons have accessible labels or adjacent text
+- [ ] Test device empty/loading/error states reuse shared visual primitives
+- [ ] Test device cards do not horizontally overflow or clip status/heartbeat text on mobile, tablet, or desktop
+
 ---
 
 ## Documentation
@@ -356,6 +371,7 @@
 - [ ] Create device event ingestion guide
 - [ ] Document nonce replay protection
 - [ ] Add device type definitions and use cases
+- [ ] Document device fleet visual state model, heartbeat recency rules, and reliability seal source data
 
 ### Integration Guides
 - [ ] Create "Device Integration Quick Start" guide

@@ -21,8 +21,19 @@
     <ul class="event-list" data-testid="ledger-events-list">
       @for (event of events; track event.id) {
         <li data-testid="ledger-event-row">
-          <strong>{{ event.type }}</strong> — {{ event.subjectType }} / {{ event.subjectId }}<br />
-          <small>Actor: {{ event.actorType }} / {{ event.actorId }}</small>
+          <strong>{{ event.payload['action'] ?? event.type }}</strong>
+          <span class="event-context"> — {{ event.subjectType }} / {{ event.subjectId }}</span>
+          <br />
+          <small data-testid="ledger-event-actor">Actor: {{ event.actorType }} / {{ event.actorId }}</small>
+          <br />
+          <small data-testid="ledger-event-metadata">
+            Result: {{ event.metadata.result }} |
+            Tenant: {{ event.metadata.tenantId }} |
+            Request: {{ event.metadata.requestId }} |
+            Correlation: {{ event.metadata.correlationId }} |
+            Source IP: {{ event.metadata.sourceIp ?? 'n/a' }} |
+            User Agent: {{ event.metadata.userAgent ?? 'n/a' }}
+          </small>
         </li>
       }
     </ul>

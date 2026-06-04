@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { TokenAuthGuard } from '../auth/token-auth.guard';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -27,6 +27,7 @@ import { TenantGuard } from '../auth/tenant.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { RateLimitGuard } from '../auth/rate-limit.guard';
+import { RateLimit } from '../auth/rate-limit.decorator';
 
 interface AuthenticatedLedgerRequest {
   user: AuthenticatedLedgerActor & { permissions?: string[] };
@@ -85,15 +86,15 @@ const apiErrorResponseSchema = {
 
 @ApiTags('Ledger Events')
 @ApiBearerAuth('jwt')
-@ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.', schema: apiErrorResponseSchema })
+@ApiUnauthorizedResponse({ description: 'Missing or invalid credentials.', schema: apiErrorResponseSchema })
 @ApiForbiddenResponse({ description: 'Tenant or permission check failed.', schema: apiErrorResponseSchema })
 @Controller('v1/ledger/events')
-@UseGuards(AuthGuard('jwt'), TenantGuard, RateLimitGuard, PermissionsGuard)
+@UseGuards(TokenAuthGuard, TenantGuard, RateLimitGuard, PermissionsGuard)
 export class LedgerEventsController {
   constructor(private readonly ledgerEventsService: LedgerEventsService) {}
 
   @Get()
-  @RequirePermissions('read')
+  @RequirePermissions('ledger.read')
   @ApiOperation({ summary: 'List ledger events for the authenticated tenant' })
   @ApiOkResponse({
     description: 'Tenant-scoped ledger events ordered by creation time.',
@@ -104,7 +105,7 @@ export class LedgerEventsController {
   }
 
   @Get('chain/verify')
-  @RequirePermissions('audit')
+  @RequirePermissions('ledger.audit')
   @ApiOperation({ summary: 'Verify the authenticated tenant ledger hash chain' })
   @ApiOkResponse({
     description: 'Ledger chain verification result.',
@@ -135,7 +136,7 @@ export class LedgerEventsController {
   }
 
   @Get(':id')
-  @RequirePermissions('read')
+  @RequirePermissions('ledger.read')
   @ApiOperation({ summary: 'Get one tenant-scoped ledger event by id' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'Ledger event id.' })
   @ApiOkResponse({ description: 'Ledger event found.', schema: ledgerEventResponseSchema })
@@ -149,7 +150,7 @@ export class LedgerEventsController {
   }
 
   @Post()
-  @RequirePermissions('write')
+  @RequirePermissions('ledger.write')
   @ApiOperation({ summary: 'Append a server-audited ledger event' })
   @ApiBody({
     description: 'Business data only. Audit metadata is derived by the server.',
@@ -183,6 +184,53 @@ export class LedgerEventsController {
   @ApiCreatedResponse({ description: 'Ledger event appended.', schema: ledgerEventResponseSchema })
   @ApiBadRequestResponse({ description: 'Invalid append payload.', schema: apiErrorResponseSchema })
   appendEvent(
+    @Body(new ZodValidationPipe(AppendLedgerEventDtoSchema))
+    payload: AppendLedgerEventDto,
+    @Req() req: AuthenticatedLedgerRequest,
+  ): Observable<LedgerEventResponse> {
+    return this.ledgerEventsService.appendEvent(payload, req.user, req.tenantId, {
+      sourceIp: req.ip,
+      userAgent: req.headers['user-agent'],
+      correlationId: req.headers['x-correlation-id'],
+    });
+  }
+
+  @Post('append-override')
+  @RequirePermissions('ledger.write')
+  @RateLimit({ maxRequests: 2, windowMs: 1000 })
+  @ApiOperation({ summary: 'Append a server-audited ledger event with endpoint-specific rate limit' })
+  @ApiBody({
+    description: 'Business data only. Audit metadata is derived by the server.',
+    schema: {
+      oneOf: [
+        {
+          type: 'object',
+          required: ['type', 'subjectType', 'subjectId', 'payload'],
+          properties: {
+            type: { type: 'string', enum: ['LEDGER_EVENT'] },
+            subjectType: { type: 'string', minLength: 1 },
+            subjectId: { type: 'string', minLength: 1 },
+            payload: { type: 'object', additionalProperties: true },
+          },
+        },
+        {
+          type: 'object',
+          required: ['type', 'subjectType', 'subjectId', 'deviceId', 'deviceType', 'payload'],
+          properties: {
+            type: { type: 'string', enum: ['DEVICE_LEDGER_EVENT'] },
+            subjectType: { type: 'string', minLength: 1 },
+            subjectId: { type: 'string', minLength: 1 },
+            deviceId: { type: 'string', minLength: 1 },
+            deviceType: { type: 'string', minLength: 1 },
+            payload: { type: 'object', additionalProperties: true },
+          },
+        },
+      ],
+    },
+  })
+  @ApiCreatedResponse({ description: 'Ledger event appended.', schema: ledgerEventResponseSchema })
+  @ApiBadRequestResponse({ description: 'Invalid append payload.', schema: apiErrorResponseSchema })
+  appendEventWithOverride(
     @Body(new ZodValidationPipe(AppendLedgerEventDtoSchema))
     payload: AppendLedgerEventDto,
     @Req() req: AuthenticatedLedgerRequest,

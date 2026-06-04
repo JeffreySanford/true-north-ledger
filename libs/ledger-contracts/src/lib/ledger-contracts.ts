@@ -20,6 +20,24 @@ export type LedgerPermission = z.infer<typeof LedgerPermissionSchema>;
 export const EventResultSchema = z.enum(['accepted', 'rejected', 'failed']);
 export type EventResult = z.infer<typeof EventResultSchema>;
 
+export const AuthLedgerEventActionSchema = z.enum([
+  'LOGIN_SUCCESS',
+  'LOGIN_FAILED',
+  'LOGOUT',
+  'TOKEN_REFRESHED',
+  'SERVICE_TOKEN_CREATED',
+  'SERVICE_TOKEN_REVOKED',
+  'PERMISSION_DENIED',
+  'RATE_LIMIT_EXCEEDED',
+]);
+export const AuthLedgerEventAction = AuthLedgerEventActionSchema.enum;
+export type AuthLedgerEventAction = z.infer<typeof AuthLedgerEventActionSchema>;
+
+export const AuthLedgerEventPayloadSchema = z.object({
+  action: AuthLedgerEventActionSchema,
+}).catchall(z.unknown());
+export type AuthLedgerEventPayload = z.infer<typeof AuthLedgerEventPayloadSchema>;
+
 export const AuditMetadataSchema = z.object({
   tenantId: z.string().uuid(),
   requestId: z.string(),
@@ -52,6 +70,12 @@ export const LedgerEventSchema = z.object({
   type: z.literal('LEDGER_EVENT'),
 });
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>;
+
+export const AuthLedgerEventSchema = LedgerEventSchema.extend({
+  subjectType: z.literal('auth'),
+  payload: AuthLedgerEventPayloadSchema,
+});
+export type AuthLedgerEvent = z.infer<typeof AuthLedgerEventSchema>;
 
 export const DeviceLedgerEventSchema = z.object({
   ...ledgerEventBase,

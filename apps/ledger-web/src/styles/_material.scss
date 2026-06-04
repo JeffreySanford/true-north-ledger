@@ -8,6 +8,17 @@
   letter-spacing: 0;
 }
 
+.mat-mdc-button,
+.mat-mdc-outlined-button {
+  --mdc-text-button-label-text-color: var(--tnl-color-primary);
+}
+
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button {
+  --mdc-filled-button-container-color: var(--tnl-color-primary);
+  --mdc-filled-button-label-text-color: var(--tnl-color-on-primary);
+}
+
 .mat-mdc-card {
   @include mixins.surface;
 }
@@ -19,4 +30,19 @@
 
 .cdk-overlay-container {
   color: var(--tnl-color-on-surface);
+}
+
+.mat-mdc-form-field {
+  --mdc-filled-text-field-container-color: var(--tnl-color-surface-container-lowest);
+  --mdc-filled-text-field-focus-active-indicator-color: var(--tnl-color-primary);
+  --mdc-filled-text-field-caret-color: var(--tnl-color-primary);
+}
+
+.mat-mdc-form-field .mdc-floating-label {
+  color: var(--tnl-color-on-surface-variant);
+}
+
+.mat-mdc-menu-panel,
+.mat-mdc-select-panel {
+  border-radius: var(--tnl-radius-md);
 }

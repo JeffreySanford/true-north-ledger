@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
+import { getStorageToken } from '@nestjs/throttler/dist/throttler.providers';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { of, throwError } from 'rxjs';
 import type { AppendLedgerEventDto, LedgerEventResponse } from '@true-north-ledger/ledger-contracts';
+import { AuthService } from '../auth/auth.service';
+import { TokenBlacklistService } from '../auth/token-blacklist.service';
 import { LedgerEventEntity } from './ledger-event.entity';
 import { LedgerEventsController } from './ledger-events.controller';
 import { LedgerEventsService } from './ledger-events.service';
@@ -13,7 +17,7 @@ describe('LedgerEventsController', () => {
       userId: 'test-user',
       actorType: 'user',
       tenantId: '00000000-0000-0000-0000-000000000000',
-      permissions: ['read', 'write'],
+      permissions: ['ledger.read', 'ledger.write'],
     },
     ip: '127.0.0.1',
     headers: {
@@ -30,6 +34,37 @@ describe('LedgerEventsController', () => {
       controllers: [LedgerEventsController],
       providers: [
         LedgerEventsService,
+        {
+          provide: JwtService,
+          useValue: {
+            verify: jest.fn(),
+          },
+        },
+        {
+          provide: AuthService,
+          useValue: {
+            verifyServiceToken: jest.fn().mockResolvedValue(null),
+            resolvePermissionsForActor: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: TokenBlacklistService,
+          useValue: {
+            isJtiBlacklisted: jest.fn().mockResolvedValue(false),
+            blacklistJti: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: getStorageToken(),
+          useValue: {
+            increment: jest.fn().mockResolvedValue({
+              totalHits: 1,
+              timeToExpire: 60,
+              isBlocked: false,
+              timeToBlockExpire: 0,
+            }),
+          },
+        },
         {
           provide: getRepositoryToken(LedgerEventEntity),
           useValue: {},

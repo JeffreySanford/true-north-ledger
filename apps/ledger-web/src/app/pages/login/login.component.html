@@ -1,0 +1,31 @@
+<section class="section-card login-card">
+  <h1>Login</h1>
+  <p>Sign in to True North Ledger with your user credentials.</p>
+  <p class="forgot-password-hint" data-testid="forgot-password-placeholder">
+    <a href="/login#forgot-password">Forgot password?</a>
+    <span>Coming in PI-2.</span>
+  </p>
+
+  <form (ngSubmit)="submit()" [formGroup]="form" class="login-form">
+    <label>
+      <span>Username</span>
+      <input formControlName="username" type="text" autocomplete="username" />
+    </label>
+
+    <label>
+      <span>Password</span>
+      <input formControlName="password" type="password" autocomplete="current-password" />
+    </label>
+
+    <label class="remember-option">
+      <input formControlName="rememberMe" type="checkbox" />
+      <span>Remember me on this device</span>
+    </label>
+
+    <button type="submit" [disabled]="isSubmitting">{{ isSubmitting ? 'Signing in…' : 'Sign in' }}</button>
+
+    @if (errorMessage) {
+      <p class="error-message">{{ errorMessage }}</p>
+    }
+  </form>
+</section>

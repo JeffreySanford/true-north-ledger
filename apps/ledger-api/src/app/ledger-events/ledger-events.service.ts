@@ -201,7 +201,9 @@ export class LedgerEventsService {
       ).pipe(
         map((savedEntity) => this.entityToResponse(savedEntity)),
         catchError((error) => {
-          console.error('Failed to append event', error);
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Failed to append event', error);
+          }
           if (error instanceof BadRequestException) {
             return throwError(() => error);
           }

@@ -7,15 +7,17 @@ import {
   LedgerEventResponse,
   LedgerEventResponseSchema,
 } from '@true-north-ledger/shared-models';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class LedgerEventsService {
   private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
 
   fetchEvents(): Observable<LedgerEventResponse[]> {
-    return this.http.get<unknown>('/api/v1/ledger/events', this.authOptions()).pipe(
+    return this.http.get<unknown>('/api/v1/ledger/events', { headers: this.authHeaders() }).pipe(
       map((raw) => {
         const parsed = LedgerEventResponseSchema.array().safeParse(raw);
         if (!parsed.success) {
@@ -44,7 +46,7 @@ export class LedgerEventsService {
     };
 
     const validated = AppendLedgerEventDtoSchema.parse(dto);
-    return this.http.post<unknown>('/api/v1/ledger/events', validated, this.authOptions()).pipe(
+    return this.http.post<unknown>('/api/v1/ledger/events', validated, { headers: this.authHeaders() }).pipe(
       map((raw) => {
         const parsed = LedgerEventResponseSchema.safeParse(raw);
         if (!parsed.success) {
@@ -60,7 +62,7 @@ export class LedgerEventsService {
   }
 
   fetchEvent(id: string): Observable<LedgerEventResponse> {
-    return this.http.get<unknown>(`/api/v1/ledger/events/${id}`, this.authOptions()).pipe(
+    return this.http.get<unknown>(`/api/v1/ledger/events/${id}`, { headers: this.authHeaders() }).pipe(
       map((raw) => {
         const parsed = LedgerEventResponseSchema.safeParse(raw);
         if (!parsed.success) {
@@ -88,14 +90,7 @@ export class LedgerEventsService {
     return error instanceof Error ? error : new Error(fallbackMessage);
   }
 
-  private authOptions(): { headers?: { Authorization: string } } {
-    const token = localStorage.getItem('tnl.authToken');
-    return token
-      ? {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      : {};
+  private authHeaders(): { Authorization?: string } {
+    return this.authService.authHeaders();
   }
 }

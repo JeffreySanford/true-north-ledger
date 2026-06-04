@@ -69,6 +69,10 @@ return from(promiseOnlyLibraryCall()).pipe(
 
 New imports of `firstValueFrom` and `lastValueFrom` are blocked by ESLint. If a future case genuinely needs one, document the exception in the code review and update the rule narrowly.
 
+> **Note:** Backend NestJS application source is linted to prevent `async` method declarations in `apps/ledger-api/src/app/**/*.ts`. Prefer `Observable<T>` return types and reserve `async` only for framework bootstrap, migrations, tests, or explicitly isolated promise boundaries.
+
+> **Note:** ESLint can help prevent Promise conversion of observable streams, but it cannot reliably enforce when a service should use a hot `Subject`/`BehaviorSubject` versus a cold `Observable`. Use architecture review for that distinction.
+
 #### Implementation Examples
 
 **Frontend Service (Angular):**
@@ -161,6 +165,8 @@ export class DataService {
   }
 }
 ```
+
+> **Note:** Hot observables and subjects are ideal for shared, evolving state or event streams. They are not required for every NestJS method. Prefer cold `Observable<T>` return values for normal request/response logic, and only use `BehaviorSubject` / `Subject` when you need a shared source that can emit over time.
 
 **Backend Controller (NestJS):**
 

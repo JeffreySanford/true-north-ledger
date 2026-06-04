@@ -1,13 +1,35 @@
 <header class="app-shell">
   <div class="brand">True North Ledger</div>
+  @if (authService.currentUser$ | async; as user) {
+    <div class="user-status" data-testid="secure-session">
+      <span class="avatar" aria-hidden="true">{{ userInitials(user.username) }}</span>
+      <tnl-status-chip label="Secure session" stateText="Authenticated user" tone="success" />
+      <tnl-trust-seal label="Session" state="verified" />
+      <span>Welcome, {{ user.username }}</span>
+    </div>
+  }
   <nav data-testid="app-nav">
-    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
-    <a routerLink="/ledger-events" routerLinkActive="active">Ledger Events</a>
-    <a routerLink="/devices" routerLinkActive="active">Devices</a>
-    <a routerLink="/proofs" routerLinkActive="active">Proofs</a>
-    <a routerLink="/settings" routerLinkActive="active">Settings</a>
+    @if (authService.isAuthenticated) {
+      @for (item of navItems; track item.route) {
+        @if (authService.hasPermission(item.permission)) {
+          <a
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: item.exact === true }"
+          >
+            {{ item.label }}
+          </a>
+        }
+      }
+      <button type="button" (click)="logout()">Logout</button>
+    } @else {
+      <a routerLink="/login">Login</a>
+    }
   </nav>
 </header>
-<main class="app-body">
+<main
+  class="app-body"
+  [@routeFadeSlide]="{ value: 'active', params: motionTimings }"
+>
   <router-outlet></router-outlet>
 </main>

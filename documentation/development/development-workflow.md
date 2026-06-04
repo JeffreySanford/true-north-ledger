@@ -34,6 +34,18 @@ Start infrastructure and applications:
 pnpm start:all
 ```
 
+Start infrastructure only:
+
+```sh
+pnpm docker:up
+```
+
+Stop infrastructure:
+
+```sh
+pnpm docker:down
+```
+
 Swagger UI:
 
 ```sh

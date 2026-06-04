@@ -2,6 +2,7 @@
 
 **Sprint Duration:** 2 weeks (July 15 - July 28, 2026)  
 **Sprint Goal:** Build inventory tracking with provenance verification and device scan integration.
+**Status:** Planned (not started as of 2026-06-04)
 
 ---
 
@@ -11,6 +12,7 @@
 - [ ] Inventory operations (add, reserve, move, remove) create ledger events
 - [ ] Device scans update inventory with actor attribution
 - [ ] Inventory provenance traceable through ledger
+- [ ] Inventory provenance timeline and anomaly visuals are available in the UI
 - [ ] Inventory alerts for low stock/anomalies
 - [ ] Inventory dashboard shows real-time status
 - [ ] Integration with device events for automated tracking
@@ -301,6 +303,9 @@
   - [ ] Quantity changes
 - [ ] Visualize location history on map/diagram
 - [ ] Show chain of custody
+- [ ] Reuse shared timeline rail, ledger event card, trust seal, status chip, and severity chip components
+- [ ] Add provenance diagram data model for movement, actor, location, quantity, and anomaly state
+- [ ] Add scan accepted/rejected animation with reduced-motion fallback
 
 ### Inventory Scan Interface
 - [ ] Create inventory-scan.page.ts
@@ -326,6 +331,7 @@
 - [ ] Show recent anomalies
 - [ ] Display recent scans
 - [ ] Add quick actions
+- [ ] Add inventory health visuals for low stock, expiring soon, damaged, reserved, and removed states
 
 ### Inventory Anomaly View
 - [ ] Create inventory-anomalies.page.ts
@@ -337,6 +343,8 @@
 - [ ] Add resolution workflow
 - [ ] Show anomaly details
 - [ ] Filter by type/status
+- [ ] Use shared severity chip and anomaly card styles from the global style system
+- [ ] Add unit tests for anomaly severity/status variants and non-color state labels
 
 ### Unit Tests
 - [ ] Inventory service tests
@@ -344,6 +352,7 @@
 - [ ] Provenance component tests
 - [ ] Scan component tests
 - [ ] Dashboard tests
+- [ ] Inventory visual primitive integration tests for provenance, scan feedback, anomaly cards, health states, empty states, and reduced-motion behavior
 
 ---
 
@@ -356,6 +365,10 @@
 - [ ] Test inventory removal
 - [ ] Test scan workflow
 - [ ] Test provenance viewing
+- [ ] Test provenance timeline renders full chain of custody with actor and location labels
+- [ ] Test scan accepted/rejected feedback is accessible and does not depend on motion
+- [ ] Test anomaly cards render severity, status, and remediation action consistently
+- [ ] Test inventory health visuals do not rely on color alone and do not clip on mobile, tablet, or desktop
 
 ### Anomaly Detection E2E
 - [ ] Test anomaly detection
@@ -371,6 +384,7 @@
 - [ ] Add provenance guide
 - [ ] Document scan integration
 - [ ] Create anomaly detection guide
+- [ ] Document provenance timeline, scan feedback, anomaly card, and inventory health visual state model
 
 ### Integration Guides
 - [ ] Create inventory integration guide

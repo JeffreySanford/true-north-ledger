@@ -5,3 +5,32 @@
 .section-card {
   margin: 1.5rem 0;
 }
+
+.dashboard-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tnl-space-3);
+  margin-bottom: var(--tnl-space-4);
+}
+
+.dashboard-role-state {
+  display: flex;
+  align-items: center;
+  gap: var(--tnl-space-3);
+  margin-bottom: var(--tnl-space-4);
+}
+
+.dashboard-role-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--tnl-radius-full);
+  border: var(--tnl-border-subtle);
+  background: var(--tnl-color-tertiary-container);
+  color: var(--tnl-color-on-tertiary-container);
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1;
+}

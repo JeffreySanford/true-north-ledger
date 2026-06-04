@@ -4,6 +4,8 @@ True North Ledger is a responsive, API-first audit platform for humans, business
 
 It is not only an admin dashboard. The UI is one client among several: web, tablet, mobile, public proof pages, partner APIs, and device ingestion all write to or read from the same ledger-backed platform.
 
+This overview focuses on the project shape and platform direction. For a concise product narrative and business-oriented brief, see [Product Brief](product-brief.md).
+
 ## Product Statement
 
 True North Ledger captures meaningful business actions as verifiable ledger events so operational history can be reviewed, proven, and trusted.
@@ -15,7 +17,7 @@ True North Ledger captures meaningful business actions as verifiable ledger even
 - `device` - scanner, printer, sensor, kiosk, tablet station, or edge gateway.
 - `system` - platform-owned automated process.
 
-Human users are authorized through RBAC roles such as `admin`, `operations_manager`, `inventory`, `shipping`, `billing`, `moderator`, `auditor`, `device_technician`, `support`, and `viewer`. Sprint 1 should seed a local admin user and replace local token setup with real login/session behavior.
+Human users are authorized through RBAC roles such as `admin`, `operations_manager`, `inventory`, `shipping`, `billing`, `moderator`, `auditor`, `device_technician`, `support`, and `viewer`. Sprint 1 is turning the Sprint 0 guard foundation into product authentication with seeded roles, login/session UX, permission-aware navigation, and route gating.
 
 ## Main Workflows
 
@@ -40,3 +42,4 @@ flowchart TD
 - Devices are first-class identities, not anonymous API callers.
 - UI experiences are shaped by workflow: web for command center, tablet for operations, mobile for scan and approve.
 - Role-specific routes are planned from the beginning across web, tablet, and mobile surfaces.
+- Gamification, Material Icons, MD3 styling, and Angular animations should make verified work clearer without becoming a client-side source of truth.
