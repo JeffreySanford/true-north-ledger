@@ -1,7 +1,135 @@
-<section class="section-card">
-  <h1 class="page-heading">Devices</h1>
-  <p>
-    Device operations and telemetry will appear here once the ledger device contract
-    is active.
-  </p>
+<section class="devices-header">
+  <div>
+    <h1 class="page-heading">Devices</h1>
+    <p>Tenant device identity, heartbeat state, and revocation controls.</p>
+  </div>
+  <tnl-trust-seal
+    label="Device reliability"
+    [state]="devices.length > 0 && countByStatus('revoked') === 0 ? 'verified' : 'pending'"
+  ></tnl-trust-seal>
+</section>
+
+<section class="device-summary" aria-label="Device status summary">
+  @for (status of deviceStatuses; track status) {
+    <div class="summary-tile">
+      <span class="summary-tile__count">{{ countByStatus(status) }}</span>
+      <span class="summary-tile__label">{{ status }}</span>
+    </div>
+  }
+</section>
+
+<section class="device-layout">
+  <tnl-device-registration
+    (registered)="handleRegistered($event)"
+    (registrationError)="handleRegistrationError($event)"
+  ></tnl-device-registration>
+
+  <section class="device-board" aria-label="Device fleet board">
+    <form class="device-filters" [formGroup]="filtersForm" (ngSubmit)="applyFilters()">
+      <label>
+        <span>Status</span>
+        <select formControlName="status">
+          <option value="">All</option>
+          @for (status of deviceStatuses; track status) {
+            <option [value]="status">{{ status }}</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        <span>Type</span>
+        <select formControlName="type">
+          <option value="">All</option>
+          @for (type of deviceTypes; track type) {
+            <option [value]="type">{{ type }}</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        <span>Search</span>
+        <input type="search" formControlName="search" />
+      </label>
+
+      <button type="submit" [disabled]="loading">Refresh</button>
+    </form>
+
+    @if (loading) {
+      <div class="device-state" data-testid="device-loading-state">
+        <tnl-connection-status
+          label="Device registry"
+          state="connecting"
+          detail="Loading device registry"
+        ></tnl-connection-status>
+      </div>
+    } @else if (error) {
+      <div class="device-state" data-testid="device-error-state">
+        <tnl-connection-status
+          label="Device registry"
+          state="failed"
+          [detail]="error"
+        ></tnl-connection-status>
+        <tnl-empty-state
+          title="Device registry unavailable"
+          [message]="error"
+          icon="info"
+        ></tnl-empty-state>
+      </div>
+    } @else if (devices.length === 0) {
+      <tnl-empty-state
+        title="No devices registered"
+        message="Register the first scanner, tablet, gateway, or kiosk for this tenant."
+        icon="info"
+      ></tnl-empty-state>
+    } @else {
+      <div class="device-list" data-testid="device-list">
+        @for (device of devices; track trackById($index, device)) {
+          <article class="device-card" data-testid="device-card">
+            <div class="device-card__main">
+              <span class="device-card__icon" [attr.aria-label]="'Device type: ' + device.type">
+                {{ device.type.slice(0, 1).toUpperCase() }}
+              </span>
+              <div>
+                <h2>
+                  <a [routerLink]="['/devices', device.id]">{{ device.name }}</a>
+                </h2>
+                <p>{{ device.type }} · {{ heartbeatText(device) }}</p>
+              </div>
+            </div>
+
+            <tnl-status-chip
+              [label]="device.status"
+              [stateText]="device.online ? 'Online' : 'Offline'"
+              [tone]="statusTone(device)"
+            ></tnl-status-chip>
+
+            <div class="device-card__actions">
+              <label>
+                <span>Status</span>
+                <select
+                  [value]="device.status"
+                  (change)="updateStatus(device, $any($event.target).value)"
+                  [disabled]="device.status === 'revoked'"
+                >
+                  @for (status of deviceStatuses; track status) {
+                    <option [value]="status">{{ status }}</option>
+                  }
+                </select>
+              </label>
+              <button type="button" (click)="revoke(device)" [disabled]="device.status === 'revoked'">Revoke</button>
+            </div>
+          </article>
+        }
+      </div>
+
+      <nav class="device-pagination" aria-label="Device registry pagination">
+        <p data-testid="device-pagination-summary">{{ paginationSummary }}</p>
+        <div class="device-pagination__actions">
+          <button type="button" (click)="previousPage()" [disabled]="page <= 1">Previous</button>
+          <span aria-live="polite">Page {{ page }} of {{ totalPages }}</span>
+          <button type="button" (click)="nextPage()" [disabled]="page >= totalPages">Next</button>
+        </div>
+      </nav>
+    }
+  </section>
 </section>

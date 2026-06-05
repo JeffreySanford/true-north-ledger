@@ -14,6 +14,7 @@ import { validateAuthEnv } from './config/auth-env.validation';
 import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { RedisThrottlerStorage } from './auth/redis-throttler.storage';
+import { DevicesModule } from './devices/devices.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { RedisThrottlerStorage } from './auth/redis-throttler.storage';
     LedgerEventsModule,
     UsersModule,
     RolesModule,
+    DevicesModule,
   ],
   controllers: [AppController],
   providers: [

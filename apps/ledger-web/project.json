@@ -20,7 +20,8 @@
             "input": "apps/ledger-web/public"
           }
         ],
-        "styles": ["apps/ledger-web/src/styles.scss"]
+        "styles": ["apps/ledger-web/src/styles.scss"],
+        "allowedCommonJsDependencies": ["qrcode"]
       },
       "configurations": {
         "production": {

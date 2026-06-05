@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Observable, from, throwError } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { createHash, randomUUID } from 'crypto';
@@ -145,6 +145,7 @@ export class LedgerEventsService {
     authenticatedUser: AuthenticatedLedgerActor,
     tenantId: string,
     requestContext: LedgerRequestContext = {},
+    transactionManager?: EntityManager,
   ): Observable<LedgerEventResponse> {
     try {
       const dto = AppendLedgerEventDtoSchema.parse(payload);
@@ -158,47 +159,49 @@ export class LedgerEventsService {
       const requestId = randomUUID();
       const correlationId = this.getSingleHeaderValue(requestContext.correlationId) ?? randomUUID();
 
-      return from(
-        this.ledgerEventRepository.manager.transaction(async (manager) => {
-          const repository = manager.getRepository(LedgerEventEntity);
-          const previousEntity = await repository.findOne({
-            where: { tenantId },
-            order: { chainSequence: 'DESC' },
-          });
-          const previousHash = previousEntity?.eventHash ?? null;
-          const chainSequence = previousEntity
-            ? (BigInt(previousEntity.chainSequence) + 1n).toString()
-            : '1';
+      const appendWithManager = async (manager: EntityManager) => {
+        const repository = manager.getRepository(LedgerEventEntity);
+        const previousEntity = await repository.findOne({
+          where: { tenantId },
+          order: { chainSequence: 'DESC' },
+        });
+        const previousHash = previousEntity?.eventHash ?? null;
+        const chainSequence = previousEntity ? (BigInt(previousEntity.chainSequence) + 1n).toString() : '1';
 
-          const entity = new LedgerEventEntity();
-          entity.id = randomUUID();
-          entity.type = dto.type;
-          entity.actorType = authenticatedUser.actorType;
-          entity.actorId = authenticatedUser.userId;
-          entity.subjectType = dto.subjectType;
-          entity.subjectId = dto.subjectId;
-          entity.payload = dto.payload;
-          entity.tenantId = tenantId;
-          entity.requestId = requestId;
-          entity.correlationId = correlationId;
-          entity.sourceIp = requestContext.sourceIp;
-          entity.userAgent = this.getSingleHeaderValue(requestContext.userAgent) ?? '';
-          entity.payloadHash = computedHash;
-          entity.previousHash = previousHash;
-          entity.chainSequence = chainSequence;
-          entity.result = 'accepted';
-          entity.timestamp = now;
+        const entity = new LedgerEventEntity();
+        entity.id = randomUUID();
+        entity.type = dto.type;
+        entity.actorType = authenticatedUser.actorType;
+        entity.actorId = authenticatedUser.userId;
+        entity.subjectType = dto.subjectType;
+        entity.subjectId = dto.subjectId;
+        entity.payload = dto.payload;
+        entity.tenantId = tenantId;
+        entity.requestId = requestId;
+        entity.correlationId = correlationId;
+        entity.sourceIp = requestContext.sourceIp;
+        entity.userAgent = this.getSingleHeaderValue(requestContext.userAgent) ?? '';
+        entity.payloadHash = computedHash;
+        entity.previousHash = previousHash;
+        entity.chainSequence = chainSequence;
+        entity.result = 'accepted';
+        entity.timestamp = now;
 
-          if (dto.type === 'DEVICE_LEDGER_EVENT') {
-            entity.deviceId = dto.deviceId;
-            entity.deviceType = dto.deviceType;
-          }
+        if (dto.type === 'DEVICE_LEDGER_EVENT') {
+          entity.deviceId = dto.deviceId;
+          entity.deviceType = dto.deviceType;
+        }
 
-          entity.eventHash = this.computeEventHash(entity);
+        entity.eventHash = this.computeEventHash(entity);
 
-          return repository.save(entity);
-        }),
-      ).pipe(
+        return repository.save(entity);
+      };
+
+      const savePromise = transactionManager
+        ? appendWithManager(transactionManager)
+        : this.ledgerEventRepository.manager.transaction(appendWithManager);
+
+      return from(savePromise).pipe(
         map((savedEntity) => this.entityToResponse(savedEntity)),
         catchError((error) => {
           if (process.env.NODE_ENV !== 'test') {

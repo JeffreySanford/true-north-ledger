@@ -88,67 +88,75 @@ flowchart LR
 
 ### Sprint Acceptance Criteria
 
-- [ ] Devices can register with unique identity and receive scoped tokens
-- [ ] Device authentication validates device tokens
-- [ ] Device heartbeat endpoint tracks online/offline status
-- [ ] Device events create ledger entries with device actor context
-- [ ] Device revocation immediately blocks access
-- [ ] Nonce validation prevents replay attacks
-- [ ] Device status visible in admin UI
-- [ ] Device fleet visual states, heartbeat indicators, and reliability seals use shared visual primitives
+- [x] Devices can register with unique identity and receive scoped API keys
+- [x] Device authentication validates device API keys
+- [x] Device heartbeat endpoint tracks online/offline status
+- [x] Device events create ledger entries with device actor context
+- [x] Device revocation immediately blocks access
+- [x] Nonce validation prevents replay attacks
+- [x] Device status visible in admin UI
+- [x] Device fleet visual states, heartbeat indicators, and reliability seals use shared visual primitives
 
 ### Tasks
 
 #### Backend Device System
-- [ ] Create `devices` module in ledger-api
-- [ ] Create `Device` entity with TypeORM
-- [ ] Implement device registration endpoint (`POST /api/v1/devices/register`)
-- [ ] Build device token generation (scoped JWT or API key)
-- [ ] Create `DeviceAuthGuard` for device endpoints
-- [ ] Implement heartbeat endpoint (`POST /api/v1/devices/heartbeat`)
-- [ ] Add device status endpoint (`GET /api/v1/devices/:id/status`)
-- [ ] Create device event ingestion endpoint (`POST /api/v1/device-events`)
-- [ ] Implement batch device event endpoint (`POST /api/v1/device-events/batch`)
-- [ ] Add nonce tracking for replay protection (Redis-backed)
-- [ ] Build device revocation logic with immediate token invalidation
-- [ ] Create device-related ledger event types (DEVICE_REGISTERED, DEVICE_HEARTBEAT, DEVICE_REVOKED)
-- [ ] Write behavior-focused unit tests for device service
-- [ ] Write integration tests for device registration and auth
-- [ ] Add OpenAPI documentation for device endpoints
+- [x] Create `devices` module in ledger-api
+- [x] Create `Device` entity with TypeORM
+- [x] Implement device registration endpoint (`POST /api/v1/devices/register`)
+- [x] Build device token generation with scoped API keys
+- [x] Create `DeviceAuthGuard` for device endpoints
+- [x] Implement heartbeat endpoint (`POST /api/v1/devices/heartbeat`)
+- [x] Add device status endpoint (`GET /api/v1/devices/:id/status`)
+- [x] Create device event ingestion endpoint (`POST /api/v1/device-events`)
+- [x] Implement batch device event endpoint (`POST /api/v1/device-events/batch`)
+- [x] Add database-backed nonce tracking for replay protection with expiration cleanup
+- [x] Build device revocation logic with immediate token invalidation
+- [x] Create device-related ledger event types for registration, heartbeat, revocation, status, and event ingestion
+- [x] Write behavior-focused unit tests for device service
+- [x] Write integration tests for device registration and auth
+- [x] Add OpenAPI documentation for device endpoints
 
 #### Contract Updates
-- [ ] Create device registration schema in device-contracts
-- [ ] Add device event batch schema
-- [ ] Define device status enums and schemas
-- [ ] Add device authentication request/response schemas
+- [x] Create device registration schema in device-contracts
+- [x] Add device event batch schema
+- [x] Define device status enums and schemas
+- [x] Add device authentication request/response schemas
 
 #### Frontend Device Management
-- [ ] Create `DeviceService` in ledger-web
-- [ ] Build device registry page (`/devices`)
-- [ ] Add device registration form
-- [ ] Display device list with status indicators
-- [ ] Show device heartbeat timestamps
-- [ ] Implement device revocation UI
-- [ ] Add device event stream view
-- [ ] Write unit tests for device service
+- [x] Create `DeviceService` in ledger-web
+- [x] Build device registry page (`/devices`)
+- [x] Add device registration form
+- [x] Display device list with status indicators
+- [x] Show device heartbeat timestamps
+- [x] Implement device revocation UI
+- [x] Add device event stream view
+- [x] Write unit tests for device service
 
 #### Visual & Experience Work
-- [ ] Add device fleet command board using shared MD3 surfaces
-- [ ] Use shared status chip, severity chip, trust seal, mission card, and empty state components
-- [ ] Add device type iconography with accessible labels or adjacent text
-- [ ] Add heartbeat sparkline or compact recency visual with timestamp text
-- [ ] Add reliability seal derived from server heartbeat and revocation state
-- [ ] Add unit tests for online, offline, suspended, revoked, empty, loading, and error visual states
+- [x] Add device fleet command board using shared MD3 surfaces
+- [x] Use shared status chip, severity chip, trust seal, mission card, and empty state components
+- [x] Add device type iconography with accessible labels or adjacent text
+- [x] Add heartbeat sparkline or compact recency visual with timestamp text
+- [x] Add reliability seal derived from server heartbeat and revocation state
+- [x] Add unit tests for online, offline, suspended, revoked, empty, loading, and error visual states
 
 #### Testing & Documentation
-- [ ] E2E tests: device registration flow
-- [ ] E2E tests: device authentication and event submission
-- [ ] E2E tests: revoked devices cannot submit events
-- [ ] E2E tests: batch device events processed correctly
-- [ ] E2E tests: nonce replay protection works
-- [ ] E2E tests: device fleet board visual states and heartbeat indicators do not rely on color alone
-- [ ] Document device registration flow
-- [ ] Create device integration guide for hardware partners
+- [x] E2E tests: device registration flow
+- [x] E2E tests: device authentication and event submission
+- [x] E2E tests: revoked devices cannot submit events
+- [x] E2E tests: batch device events processed correctly
+- [x] E2E tests: nonce replay protection works
+- [x] E2E tests: device fleet board visual states and heartbeat indicators do not rely on color alone
+- [x] Document device registration flow
+- [x] Create device integration guide for hardware partners
+
+### Sprint 2 Delivery Status
+
+- Sprint 2 execution details and completion tracking are maintained in `planning/SPRINT-2-TASKS.md`.
+- Documentation deliverables completed in Sprint 2 now include:
+  - `documentation/platform/device-management.md`
+  - `documentation/platform/device-event-ingestion-guide.md`
+- Remaining Sprint 2 closeout items are code review approval and development-environment deployment testing.
 
 ---
 

@@ -178,11 +178,11 @@ test('defaults to sessionStorage when remember me is not selected', async ({ pag
   await page.locator('input[formcontrolname="username"]').fill('temp-user');
   await page.locator('input[formcontrolname="password"]').fill('temp-user');
   await expect(page.locator('input[formcontrolname="rememberMe"]')).not.toBeChecked();
-  await page.click('button[type="submit"]');
+  await page.locator('button[type="submit"]').click();
 
-  await expect(page).toHaveURL(/\/dashboard/);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('tnl.authToken'))).toBe('session-storage-access-token');
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
   await expect(page.evaluate(() => localStorage.getItem('tnl.authToken'))).resolves.toBeNull();
-  await expect(page.evaluate(() => sessionStorage.getItem('tnl.authToken'))).resolves.toBe('session-storage-access-token');
 });
 
 test('redirects unauthenticated users to login and returns to intended route after login', async ({ page }) => {

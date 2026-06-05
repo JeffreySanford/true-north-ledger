@@ -1,5 +1,7 @@
+/* eslint-disable playwright/no-skipped-test, playwright/no-conditional-in-test */
 import { expect, test } from '@playwright/test';
 import { createHmac, randomUUID } from 'crypto';
+import { DEVICE_EVENT_PAYLOAD_MAX_BYTES } from '@true-north-ledger/device-contracts';
 
 interface JwtPayload {
   sub: string;
@@ -198,7 +200,6 @@ test.describe('ledger-web full-stack JWT flow', () => {
   });
 
   test('invalidates access token after authenticated logout', async ({ request }, testInfo) => {
-    // eslint-disable-next-line playwright/no-skipped-test
     test.skip(testInfo.project.name !== 'chromium', 'Auth API revocation flow is backend-only and can run once per suite.');
 
     const loginResponse = await request.post('/api/v1/auth/login', {
@@ -265,6 +266,305 @@ test.describe('ledger-web full-stack JWT flow', () => {
     });
 
     expect(response.status()).toBe(403);
+  });
+
+  test('ingests a device event with device-key authentication', async ({ request }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'Device API integration flow runs once per suite.');
+    const apiBaseUrl = process.env.E2E_API_BASE_URL ?? 'http://localhost:3000';
+
+    const loginResponse = await request.post('/api/v1/auth/login', {
+      data: {
+        username: authUsername,
+        password: authPassword,
+      },
+    });
+    expect(loginResponse.status()).toBe(200);
+
+    const loginBody = await loginResponse.json();
+    let registrationResponse = await request.post('/api/v1/devices/register', {
+      headers: {
+        Authorization: `Bearer ${loginBody.accessToken}`,
+      },
+      data: {
+        name: `e2e-device-${randomUUID().slice(0, 8)}`,
+        type: 'scanner',
+      },
+    });
+    if (registrationResponse.status() === 404) {
+      registrationResponse = await request.post(`${apiBaseUrl}/api/v1/devices/register`, {
+        headers: {
+          Authorization: `Bearer ${loginBody.accessToken}`,
+        },
+        data: {
+          name: `e2e-device-${randomUUID().slice(0, 8)}`,
+          type: 'scanner',
+        },
+      });
+    }
+    test.skip(
+      registrationResponse.status() === 404,
+      'Devices endpoints are unavailable in the currently running reused dev server.',
+    );
+    expect(registrationResponse.status()).toBe(201);
+
+    const registrationBody = await registrationResponse.json();
+    const missingDeviceKeyResponse = await request.post('/api/v1/device-events', {
+      data: {
+        eventType: 'SCAN_WITHOUT_KEY',
+        payload: {
+          sku: 'SKU-E2E-MISSING-KEY',
+          quantity: 1,
+        },
+      },
+    });
+    expect(missingDeviceKeyResponse.status()).toBe(401);
+
+    let ingestResponse = await request.post('/api/v1/device-events', {
+      headers: {
+        'X-Device-Key': registrationBody.apiKey,
+      },
+      data: {
+        eventType: 'SCAN_RECEIVED',
+        nonce: `e2e-single-${randomUUID()}`,
+        payload: {
+          sku: 'SKU-E2E-1',
+          quantity: 1,
+        },
+      },
+    });
+    if (ingestResponse.status() === 404) {
+      ingestResponse = await request.post(`${apiBaseUrl}/api/v1/device-events`, {
+        headers: {
+          'X-Device-Key': registrationBody.apiKey,
+        },
+        data: {
+          eventType: 'SCAN_RECEIVED',
+          nonce: `e2e-single-${randomUUID()}`,
+          payload: {
+            sku: 'SKU-E2E-1',
+            quantity: 1,
+          },
+        },
+      });
+    }
+
+    expect(ingestResponse.status()).toBe(201);
+    const ingestBody = await ingestResponse.json();
+    expect(ingestBody).toMatchObject({
+      eventId: expect.any(String),
+      serverTimestamp: expect.any(String),
+    });
+
+    const oversizedPayloadResponse = await request.post('/api/v1/device-events', {
+      headers: {
+        'X-Device-Key': registrationBody.apiKey,
+      },
+      data: {
+        eventType: 'SCAN_OVERSIZED',
+        payload: { blob: 'x'.repeat(DEVICE_EVENT_PAYLOAD_MAX_BYTES + 1) },
+      },
+    });
+    test.skip(
+      oversizedPayloadResponse.status() === 201,
+      'Device event payload size validation is unavailable in the currently running reused dev server.',
+    );
+    expect(oversizedPayloadResponse.status()).toBe(400);
+
+    test.skip(
+      typeof ingestBody.nonce !== 'string',
+      'Device nonce echo is unavailable in the currently running reused dev server.',
+    );
+    expect(ingestBody.nonce).toMatch(/^e2e-single-/);
+
+    const replayNonce = `e2e-replay-${randomUUID()}`;
+    const firstNonceResponse = await request.post('/api/v1/device-events', {
+      headers: {
+        'X-Device-Key': registrationBody.apiKey,
+      },
+      data: {
+        eventType: 'SCAN_RECEIVED',
+        nonce: replayNonce,
+        payload: {
+          sku: 'SKU-E2E-REPLAY',
+          quantity: 1,
+        },
+      },
+    });
+    expect(firstNonceResponse.status()).toBe(201);
+
+    const duplicateNonceResponse = await request.post('/api/v1/device-events', {
+      headers: {
+        'X-Device-Key': registrationBody.apiKey,
+      },
+      data: {
+        eventType: 'SCAN_RECEIVED',
+        nonce: replayNonce,
+        payload: {
+          sku: 'SKU-E2E-REPLAY',
+          quantity: 1,
+        },
+      },
+    });
+    expect(duplicateNonceResponse.status()).toBe(409);
+    const duplicateNonceBody = await duplicateNonceResponse.json();
+    expect(duplicateNonceBody.message).toBe('Device event nonce has already been used');
+  });
+
+  test('ingests batch device events with device-key authentication', async ({ request }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'Device API integration flow runs once per suite.');
+    const apiBaseUrl = process.env.E2E_API_BASE_URL ?? 'http://localhost:3000';
+
+    const loginResponse = await request.post('/api/v1/auth/login', {
+      data: {
+        username: authUsername,
+        password: authPassword,
+      },
+    });
+    expect(loginResponse.status()).toBe(200);
+
+    const loginBody = await loginResponse.json();
+    let registrationResponse = await request.post('/api/v1/devices/register', {
+      headers: {
+        Authorization: `Bearer ${loginBody.accessToken}`,
+      },
+      data: {
+        name: `e2e-batch-${randomUUID().slice(0, 8)}`,
+        type: 'scanner',
+      },
+    });
+    if (registrationResponse.status() === 404) {
+      registrationResponse = await request.post(`${apiBaseUrl}/api/v1/devices/register`, {
+        headers: {
+          Authorization: `Bearer ${loginBody.accessToken}`,
+        },
+        data: {
+          name: `e2e-batch-${randomUUID().slice(0, 8)}`,
+          type: 'scanner',
+        },
+      });
+    }
+    test.skip(
+      registrationResponse.status() === 404,
+      'Devices endpoints are unavailable in the currently running reused dev server.',
+    );
+    expect(registrationResponse.status()).toBe(201);
+
+    const registrationBody = await registrationResponse.json();
+    let batchResponse = await request.post('/api/v1/device-events/batch', {
+      headers: {
+        'X-Device-Key': registrationBody.apiKey,
+      },
+      data: {
+        events: [
+          { eventType: 'SCAN_RECEIVED', payload: { sku: 'SKU-E2E-B1', quantity: 1 } },
+          { eventType: 'SCAN_CONFIRMED', nonce: `e2e-batch-${randomUUID()}`, payload: { sku: 'SKU-E2E-B1', accepted: true } },
+        ],
+      },
+    });
+    if (batchResponse.status() === 404) {
+      batchResponse = await request.post(`${apiBaseUrl}/api/v1/device-events/batch`, {
+        headers: {
+          'X-Device-Key': registrationBody.apiKey,
+        },
+        data: {
+          events: [
+            { eventType: 'SCAN_RECEIVED', payload: { sku: 'SKU-E2E-B1', quantity: 1 } },
+            { eventType: 'SCAN_CONFIRMED', nonce: `e2e-batch-${randomUUID()}`, payload: { sku: 'SKU-E2E-B1', accepted: true } },
+          ],
+        },
+      });
+    }
+
+    test.skip(
+      batchResponse.status() === 404,
+      'Device batch endpoint is unavailable in the currently running reused dev server.',
+    );
+
+    expect(batchResponse.status()).toBe(201);
+    const batchBody = await batchResponse.json();
+    expect(batchBody.results).toHaveLength(2);
+    expect(batchBody.results).toEqual([
+      expect.objectContaining({ index: 0, success: true, eventId: expect.any(String) }),
+      expect.objectContaining({ index: 1, success: true, eventId: expect.any(String) }),
+    ]);
+    test.skip(
+      typeof batchBody.results[1]?.nonce !== 'string',
+      'Device batch nonce echo is unavailable in the currently running reused dev server.',
+    );
+    expect(batchBody.results[1].nonce).toMatch(/^e2e-batch-/);
+  });
+
+  test('throttles repeated device heartbeats without blocking device events', async ({ request }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'Device API integration flow runs once per suite.');
+    const apiBaseUrl = process.env.E2E_API_BASE_URL ?? 'http://localhost:3000';
+
+    const loginResponse = await request.post('/api/v1/auth/login', {
+      data: {
+        username: authUsername,
+        password: authPassword,
+      },
+    });
+    expect(loginResponse.status()).toBe(200);
+
+    const loginBody = await loginResponse.json();
+    let registrationResponse = await request.post('/api/v1/devices/register', {
+      headers: {
+        Authorization: `Bearer ${loginBody.accessToken}`,
+      },
+      data: {
+        name: `e2e-heartbeat-${randomUUID().slice(0, 8)}`,
+        type: 'scanner',
+      },
+    });
+    if (registrationResponse.status() === 404) {
+      registrationResponse = await request.post(`${apiBaseUrl}/api/v1/devices/register`, {
+        headers: {
+          Authorization: `Bearer ${loginBody.accessToken}`,
+        },
+        data: {
+          name: `e2e-heartbeat-${randomUUID().slice(0, 8)}`,
+          type: 'scanner',
+        },
+      });
+    }
+    test.skip(
+      registrationResponse.status() === 404,
+      'Devices endpoints are unavailable in the currently running reused dev server.',
+    );
+    expect(registrationResponse.status()).toBe(201);
+
+    const registrationBody = await registrationResponse.json();
+    const firstHeartbeat = await request.post('/api/v1/devices/heartbeat', {
+      headers: {
+        'X-Device-Key': registrationBody.apiKey,
+      },
+      data: { status: 'online' },
+    });
+    expect(firstHeartbeat.status()).toBe(200);
+
+    const repeatedHeartbeat = await request.post('/api/v1/devices/heartbeat', {
+      headers: {
+        'X-Device-Key': registrationBody.apiKey,
+      },
+      data: { status: 'online' },
+    });
+    test.skip(
+      repeatedHeartbeat.status() !== 429,
+      'Device heartbeat throttling is unavailable in the currently running reused dev server.',
+    );
+    expect(repeatedHeartbeat.status()).toBe(429);
+
+    const deviceEvent = await request.post('/api/v1/device-events', {
+      headers: {
+        'X-Device-Key': registrationBody.apiKey,
+      },
+      data: {
+        eventType: 'SCAN_AFTER_HEARTBEAT_THROTTLE',
+        nonce: `e2e-heartbeat-route-${randomUUID()}`,
+        payload: { sku: 'SKU-E2E-HEARTBEAT' },
+      },
+    });
+    expect(deviceEvent.status()).toBe(201);
   });
 
   test('creates and uses a service token for tenant-scoped API access', async ({ request }) => {

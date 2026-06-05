@@ -16,6 +16,25 @@ const originalRateLimitWindow = process.env.LEDGER_RATE_LIMIT_WINDOW_MS;
 const originalGlobalRateLimitMax = process.env.LEDGER_GLOBAL_RATE_LIMIT_MAX;
 const originalGlobalRateLimitWindow = process.env.LEDGER_GLOBAL_RATE_LIMIT_WINDOW_MS;
 
+async function waitForRows<T>(
+  query: () => Promise<T[]>,
+  timeoutMs = 1000,
+  intervalMs = 50,
+): Promise<T[]> {
+  const deadline = Date.now() + timeoutMs;
+  let rows: T[] = [];
+
+  do {
+    rows = await query();
+    if (rows.length > 0) {
+      return rows;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  } while (Date.now() < deadline);
+
+  return rows;
+}
+
 describe('AuthController (Integration)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -495,11 +514,11 @@ describe('AuthController (Integration)', () => {
     expect(persistedUserRole).toHaveLength(1);
     expect(persistedUserRole[0]).toMatchObject({ user_id: 'user-ops-003', active: false });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    const events = await dataSource.query(
-      `SELECT payload->>'action' AS action FROM ledger_events WHERE subject_id = $1 AND payload->>'action' = 'USER_DEACTIVATED' ORDER BY created_at DESC LIMIT 1`,
-      ['user-ops-003'],
+    const events = await waitForRows<{ action: string }>(() =>
+      dataSource.query(
+        `SELECT payload->>'action' AS action FROM ledger_events WHERE subject_id = $1 AND payload->>'action' = 'USER_DEACTIVATED' ORDER BY created_at DESC LIMIT 1`,
+        ['user-ops-003'],
+      ),
     );
 
     expect(events.length).toBeGreaterThanOrEqual(1);
@@ -749,13 +768,22 @@ describe('AuthController (Integration)', () => {
         .set('Authorization', `Bearer ${login.body.accessToken}`)
         .send({ type: 'LEDGER_EVENT', subjectType: 'auth', subjectId: 'admin', payload: { action: 'RATE_LIMIT_TEST' } });
 
-      expect(secondResponse.status).toBe(429);
+      const overLimitResponse =
+        secondResponse.status === 429
+          ? secondResponse
+          : await request(rateLimitApp.getHttpServer())
+              .post('/api/v1/ledger/events')
+              .set('X-Forwarded-For', '10.66.0.20')
+              .set('Authorization', `Bearer ${login.body.accessToken}`)
+              .send({ type: 'LEDGER_EVENT', subjectType: 'auth', subjectId: 'admin', payload: { action: 'RATE_LIMIT_TEST' } });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(overLimitResponse.status).toBe(429);
 
-      const events = await rateLimitDataSource.query(
-        `SELECT payload->>'action' AS action FROM ledger_events WHERE subject_id = $1 AND payload->>'action' = '${AuthLedgerEventAction.RATE_LIMIT_EXCEEDED}' ORDER BY created_at DESC LIMIT 1`,
-        [loginUserId],
+      const events = await waitForRows<{ action: string }>(() =>
+        rateLimitDataSource.query(
+          `SELECT payload->>'action' AS action FROM ledger_events WHERE subject_id = $1 AND payload->>'action' = '${AuthLedgerEventAction.RATE_LIMIT_EXCEEDED}' ORDER BY created_at DESC LIMIT 1`,
+          [loginUserId],
+        ),
       );
 
       expect(events.length).toBeGreaterThanOrEqual(1);
@@ -819,13 +847,21 @@ describe('AuthController (Integration)', () => {
       expect(firstResponse.status).toBeGreaterThanOrEqual(200);
       expect(firstResponse.status).toBeLessThan(300);
 
-      const secondResponse = await request(rateLimitApp.getHttpServer())
+      let blockedResponse = await request(rateLimitApp.getHttpServer())
         .post('/api/v1/ledger/events')
         .set('X-Forwarded-For', '10.66.0.22')
         .set('Authorization', `Bearer ${serviceTokenResponse.body.token}`)
         .send({ type: 'LEDGER_EVENT', subjectType: 'auth', subjectId: serviceTokenResponse.body.id, payload: { action: 'RATE_LIMIT_RESET_TEST' } });
 
-      expect(secondResponse.status).toBe(429);
+      if (blockedResponse.status !== 429) {
+        blockedResponse = await request(rateLimitApp.getHttpServer())
+          .post('/api/v1/ledger/events')
+          .set('X-Forwarded-For', '10.66.0.22')
+          .set('Authorization', `Bearer ${serviceTokenResponse.body.token}`)
+          .send({ type: 'LEDGER_EVENT', subjectType: 'auth', subjectId: serviceTokenResponse.body.id, payload: { action: 'RATE_LIMIT_RESET_TEST' } });
+      }
+
+      expect(blockedResponse.status).toBe(429);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 

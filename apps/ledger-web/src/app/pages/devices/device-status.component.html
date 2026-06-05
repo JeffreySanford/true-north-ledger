@@ -1,0 +1,35 @@
+<div class="detail-actions" data-testid="device-status-management">
+  <label>
+    <span>Status</span>
+    <select
+      [value]="device.status"
+      (change)="requestStatusChange($any($event.target).value)"
+      [disabled]="device.status === 'revoked'"
+      aria-describedby="device-status-warning"
+    >
+      @for (status of statuses; track status) {
+        <option [value]="status">{{ status }}</option>
+      }
+    </select>
+  </label>
+  <button type="button" (click)="requestRevocation()" [disabled]="device.status === 'revoked'">Revoke Device</button>
+</div>
+
+<p id="device-status-warning" class="status-warning">
+  Suspended and revoked devices cannot authenticate with their device API key.
+</p>
+
+@if (statusAuditTrail().length > 0) {
+  <section class="status-audit" aria-label="Status change audit trail">
+    <h3>Status audit trail</h3>
+    <ol>
+      @for (item of statusAuditTrail(); track trackAuditById($index, item)) {
+        <li>
+          <strong>{{ item.action }}</strong>
+          <span>{{ item.status }}</span>
+          <small>{{ item.result }} | {{ item.timestamp }}</small>
+        </li>
+      }
+    </ol>
+  </section>
+}

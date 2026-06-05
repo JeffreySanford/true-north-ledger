@@ -1,0 +1,129 @@
+<section class="detail-header">
+  <button type="button" class="link-button" (click)="backToRegistry()">Back to registry</button>
+  <div>
+    <h1 class="page-heading">{{ device?.name ?? 'Device detail' }}</h1>
+    <p>Device identity, heartbeat state, permissions, metadata, and audit events.</p>
+  </div>
+</section>
+
+@if (error) {
+  <p class="error-message">Error: {{ error }}</p>
+}
+
+@if (loading) {
+  <p class="loading-state">Loading device detail</p>
+} @else if (device) {
+  <section class="detail-grid" data-testid="device-detail">
+    <article class="detail-panel">
+      <div class="detail-panel__header">
+        <h2>Status</h2>
+        <tnl-status-chip
+          [label]="device.status"
+          [stateText]="device.online ? 'Online' : 'Offline'"
+          [tone]="statusTone(device)"
+        ></tnl-status-chip>
+      </div>
+      <dl>
+        <div>
+          <dt>Device ID</dt>
+          <dd>{{ device.id }}</dd>
+        </div>
+        <div>
+          <dt>Type</dt>
+          <dd>{{ device.type }}</dd>
+        </div>
+        <div>
+          <dt>Heartbeat</dt>
+          <dd>{{ heartbeatText(device) }}</dd>
+        </div>
+        <div>
+          <dt>Heartbeat failures</dt>
+          <dd>{{ device.heartbeatFailureCount ?? 0 }}</dd>
+        </div>
+        @if (device.autoSuspendedAt) {
+          <div>
+            <dt>Auto-suspended</dt>
+            <dd>{{ device.autoSuspendedAt }}</dd>
+          </div>
+        }
+        <div>
+          <dt>Created</dt>
+          <dd>{{ device.createdAt }}</dd>
+        </div>
+      </dl>
+      <tnl-device-status
+        [device]="device"
+        [events]="events"
+        (statusChange)="updateStatus($event)"
+        (revokeDevice)="revoke()"
+      ></tnl-device-status>
+    </article>
+
+    <article class="detail-panel">
+      <h2>Permissions</h2>
+      <ul class="permission-list">
+        @for (permission of device.permissions; track permission) {
+          <li>{{ permission }}</li>
+        }
+      </ul>
+    </article>
+
+    <article class="detail-panel">
+      <h2>Metadata</h2>
+      <pre>{{ metadataJson(device) }}</pre>
+    </article>
+
+    <article class="detail-panel detail-panel--wide">
+      <div class="detail-panel__header">
+        <h2>Heartbeat History</h2>
+        <span class="detail-panel__caption">Last 24 hours</span>
+      </div>
+      @if (heartbeatHistory.length > 0) {
+        <ol class="heartbeat-history" data-testid="device-heartbeat-history">
+          @for (heartbeat of heartbeatHistory; track trackHeartbeatById($index, heartbeat)) {
+            <li data-testid="device-heartbeat-history-row">
+              <span class="heartbeat-history__pulse" aria-hidden="true"></span>
+              <strong>{{ heartbeat.status }}</strong>
+              <span>{{ heartbeat.timestamp }}</span>
+              <small>{{ heartbeat.metrics }}</small>
+            </li>
+          }
+        </ol>
+      } @else {
+        <tnl-empty-state
+          title="No recent heartbeats"
+          message="Heartbeat audit events from the last 24 hours will appear here."
+          icon="schedule"
+        ></tnl-empty-state>
+      }
+    </article>
+
+    <article class="detail-panel detail-panel--wide">
+      <div class="detail-panel__header">
+        <h2>Device Audit Events</h2>
+        <button type="button" class="secondary-button" (click)="load()">Refresh</button>
+      </div>
+      @if (events.length > 0) {
+        <ol class="event-stream" data-testid="device-event-stream">
+          @for (event of events; track trackEventById($index, event)) {
+            <li data-testid="device-event-row">
+              <strong>{{ eventAction(event) }}</strong>
+              <span>{{ event.subjectType }} / {{ event.subjectId }}</span>
+              <small>
+                Actor: {{ event.actorType }} / {{ event.actorId }} |
+                Result: {{ event.metadata.result }} |
+                Sequence: {{ event.metadata.chainSequence }}
+              </small>
+            </li>
+          }
+        </ol>
+      } @else {
+        <tnl-empty-state
+          title="No device audit events"
+          message="Status, heartbeat, revocation, and device event records will appear here."
+          icon="info"
+        ></tnl-empty-state>
+      }
+    </article>
+  </section>
+}

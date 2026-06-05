@@ -8,7 +8,7 @@ The product goal is simple: every actor has an identity, and every meaningful ac
 
 This repository is an Nx workspace using pnpm.
 
-**Current Status:** Sprint 0 remediation and Sprint 1 authentication/RBAC foundation are complete. PI-1 is moving into Sprint 2 device-management delivery.
+**Current Status:** Sprint 0 remediation and Sprint 1 authentication/RBAC foundation are complete. PI-1 Sprint 2 device-management delivery is in progress with device registration, authentication, heartbeat, event ingestion, revocation, QR provisioning, and registry UI flows implemented locally.
 
 Implemented now:
 
@@ -29,7 +29,7 @@ Implemented now:
 - Lint/build/audit: passing cleanly
 
 **Remaining Product Gaps:**
-1. Sprint 2 device registration, authentication, heartbeat, and revocation flows are planned next.
+1. Sprint 2 device integration guides and development deployment signoff remain before formal closeout.
 2. Orders, inventory, public proofs, WebSockets, and production monitoring remain PI-1 roadmap work.
 3. Browser auth can move from storage-backed bearer tokens toward secure cookie sessions when API/client constraints allow.
 
@@ -62,6 +62,9 @@ flowchart LR
   device[Devices and Gateways]
 
   api[Ledger API]
+  register[Device Registration and QR Provisioning]
+  heartbeat[Device Heartbeats]
+  events[Device Event Ingestion]
   ledger[Audit and Provenance Engine]
   db[(Postgres)]
 
@@ -71,6 +74,12 @@ flowchart LR
   proof --> api
   partner --> api
   device --> api
+  api --> register
+  device --> heartbeat
+  device --> events
+  register --> ledger
+  heartbeat --> ledger
+  events --> ledger
   api --> ledger
   ledger --> db
 ```
@@ -197,6 +206,32 @@ Use admin login first, then create service tokens via:
 See [Service Token Management](documentation/platform/service-token-management.md) for scope, rotation, and revocation guidance.
 Partner onboarding examples are documented in [Service Token Integration Guide for Partners](documentation/platform/service-token-integration-guide.md).
 
+## Device Management Setup
+
+Device management uses the same API, web, PostgreSQL, Redis, and auth environment variables as the rest of local development. Start the stack with:
+
+```sh
+pnpm start:all
+```
+
+Register devices from `http://localhost:4200/devices` after signing in with a user that has `devices.read` and `devices.manage`. The registration response displays the raw device key and QR provisioning payload once; store the key immediately because only its hash is persisted.
+
+Device-originated calls authenticate with:
+
+```http
+X-Device-Key: tnl_dev_example
+```
+
+Device event ingestion examples, curl commands, Python and Node snippets, payload examples, batch guidance, and troubleshooting are documented in [Device Event Ingestion Guide](documentation/platform/device-event-ingestion-guide.md).
+
+Device-focused test commands:
+
+```sh
+pnpm nx test ledger-api -- --testPathPatterns=devices
+pnpm nx test ledger-web -- --include apps/ledger-web/src/app/pages/devices/devices.component.spec.ts
+pnpm nx e2e ledger-web-e2e -- apps/ledger-web-e2e/src/devices.spec.ts
+```
+
 ## Auth Testing Instructions
 
 Run auth-related backend tests:
@@ -271,6 +306,8 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 - [Auditability Plan](documentation/platform/auditability-plan.md)
 - [Ledger Model](documentation/platform/ledger-model.md)
 - [Device Ingestion](documentation/platform/device-ingestion.md)
+- [Device Management](documentation/platform/device-management.md)
+- [Device Event Ingestion Guide](documentation/platform/device-event-ingestion-guide.md)
 - [Security Model](documentation/platform/security-model.md)
 - [RBAC and Role-Specific Views](documentation/platform/rbac-and-views.md)
 - [Service Token Management](documentation/platform/service-token-management.md)
@@ -292,6 +329,7 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 ### Integration Guides
 
 - [Service Token Integration Guide for Partners](documentation/platform/service-token-integration-guide.md)
+- [Device Event Ingestion Guide](documentation/platform/device-event-ingestion-guide.md)
 
 ### Planning & Roadmap
 

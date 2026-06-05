@@ -50,7 +50,8 @@
       "dependsOn": ["build"],
       "options": {
         "buildTarget": "ledger-api:build",
-        "runBuildTargetDependencies": false
+        "runBuildTargetDependencies": false,
+        "inspect": false
       },
       "configurations": {
         "development": {

@@ -15,6 +15,7 @@ interface RateLimitRequest {
   user?: { userId?: string; sub?: string; actorType?: string; tenantId?: string };
   url?: string;
   path?: string;
+  route?: { path?: string };
   headers?: Record<string, string | string[] | undefined>;
   ip?: string;
 }
@@ -54,7 +55,9 @@ export class RateLimitGuard implements CanActivate {
       : typeof forwardedFor === 'string'
         ? forwardedFor.split(',')[0].trim()
         : request.ip;
-    const key = `${RateLimitGuard.keyNamespace}:${tenantId}:${actorType}:${actorId}:${tracker ?? 'unknown'}`;
+    const routeKey = `${request.method}:${request.route?.path ?? request.path ?? request.url?.split('?')[0] ?? 'unknown'}`;
+    const trackerKey = actorType === 'device' ? 'device' : tracker ?? 'unknown';
+    const key = `${RateLimitGuard.keyNamespace}:${tenantId}:${actorType}:${actorId}:${routeKey}:${trackerKey}`;
     const result = await this.throttlerStorage.increment(key, windowMs, maxRequests, windowMs, 'route-limit');
 
     if (result.isBlocked) {

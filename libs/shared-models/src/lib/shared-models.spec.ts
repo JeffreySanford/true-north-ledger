@@ -1,5 +1,9 @@
 import {
   AuthErrorSchema,
+  DeviceEventRequestSchema,
+  DeviceHardwareExamples,
+  DeviceRegistrationRequestSchema,
+  DeviceTypeSchema,
   PermissionSchema,
   RateLimitErrorSchema,
   RoleSchema,
@@ -99,5 +103,30 @@ describe('shared-models', () => {
 
     expect(parsed.actorType).toBe('user');
     expect(parsed.roles).toEqual(['operations_manager']);
+  });
+
+  it('exports schema-valid hardware examples for every supported device type', () => {
+    const expectedTypes = DeviceTypeSchema.options;
+    const exampleEntries = Object.entries(DeviceHardwareExamples);
+
+    expect(exampleEntries.map(([type]) => type).sort()).toEqual([...expectedTypes].sort());
+
+    for (const [type, example] of exampleEntries) {
+      const registration = DeviceRegistrationRequestSchema.parse(example.registration);
+      const event = DeviceEventRequestSchema.parse(example.event);
+
+      expect(registration.type).toBe(type);
+      expect(registration.permissions).toContain('device.heartbeat.write');
+      expect(registration.permissions).toContain('device.events.write');
+      expect(event.eventType).toMatch(/^[a-z]+(?:\.[a-z]+)+$/);
+      expect(event.payload).not.toEqual({});
+      expect(example.useCase.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('keeps hardware example nonces unique for replay-safe documentation', () => {
+    const nonces = Object.values(DeviceHardwareExamples).map((example) => example.event.nonce);
+
+    expect(new Set(nonces).size).toBe(nonces.length);
   });
 });

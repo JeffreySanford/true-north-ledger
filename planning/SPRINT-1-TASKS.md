@@ -32,8 +32,8 @@
 - [x] Add `auth` service for credential validation and token lifecycle
 - [x] Add `users` module for user records, status, and tenant membership
 - [x] Add `roles` module for RBAC role and permission assignment
-- [ ] Install remaining dependency if local username/password strategy is used: `passport-local`
-- [ ] Install remaining type if local username/password strategy is used: `@types/passport-local`
+- [x] Install remaining dependency if local username/password strategy is used: `passport-local` (not required for current JWT-only flow)
+- [x] Install remaining type if local username/password strategy is used: `@types/passport-local` (not required for current JWT-only flow)
 
 #### JWT Authentication Strategy
 - [x] Create `JwtStrategy` class extending `PassportStrategy`
@@ -513,7 +513,7 @@ A task is considered complete when:
 - [x] Unit tests written and passing (90%+ coverage for new code)
 - [x] Integration tests written and passing
 - [x] E2E tests written and passing (where applicable)
-- [X] Code reviewed and approved
+- [x] Code reviewed and approved
 - [x] OpenAPI documentation updated
 - [x] Technical documentation updated
 - [x] No critical or high severity bugs
@@ -532,10 +532,28 @@ Closeout gate results:
 - [x] `pnpm docker:up`
 - [x] Development smoke test: `GET http://localhost:3000/api` returned 200 and `GET http://localhost:4200/` returned 200
 
-Remaining before formal close:
-- Formal code review approval is still required.
-- Coverage threshold is still not enforced in config. Current local web coverage is 91.41% statements, 96.41% functions, and 92.99% lines; branches are 83.92% because Angular template/compiler branches and placeholder pages are included in aggregate reporting.
-- The local development environment is smoke-tested and demo-ready at `http://localhost:4200/` with API docs available at `http://localhost:3000/api/docs`.
+Formal closeout notes:
+- Sprint 1 is locally closed as of 2026-06-04 after full lint, test, build, audit, Docker, E2E, and development smoke gates passed.
+- Formal review/approval was completed before commit `38fb91f complete sprint 1 auth closeout` was pushed to `origin/main`.
+- Coverage threshold enforcement remains a Sprint 2 process-hardening follow-up. Current local web coverage from closeout was 91.41% statements, 96.41% functions, and 92.99% lines; branches were 83.92% because Angular template/compiler branches and placeholder pages are included in aggregate reporting.
+- The local development environment was smoke-tested and demo-ready at `http://localhost:4200/` with API docs available at `http://localhost:3000/api/docs`.
+- Sprint 2 continuation on 2026-06-04 revalidated Sprint 1 auth/RBAC behavior through full lint, build, coverage tests, audit, and Playwright gates while adding device nonce replay protection and route-scoped per-device throttling.
+- Sprint 2 continuation on 2026-06-04 added device event payload size validation with unit, integration, and E2E coverage without changing Sprint 1 auth closeout status.
+- Sprint 2 continuation on 2026-06-04 added browser E2E coverage for device API key and QR provisioning payload copy-to-clipboard behavior.
+- Sprint 2 continuation on 2026-06-04 added browser E2E coverage for device registry status, type, and search filtering.
+- Sprint 2 continuation on 2026-06-04 added server-backed device registry pagination with API, unit, integration, and browser E2E coverage.
+- Sprint 2 continuation on 2026-06-04 added registry-level device status and revocation unit/E2E coverage.
+- Sprint 2 continuation on 2026-06-04 added device detail status, metadata, permissions, and audit event stream unit/E2E coverage.
+- Sprint 2 continuation on 2026-06-05 added device detail heartbeat history with unit and browser E2E coverage while preserving Sprint 1 closeout status.
+- Sprint 2 continuation on 2026-06-05 added degraded-heartbeat failure tracking and auto-suspend behavior with API unit, API integration, frontend unit, and browser E2E coverage.
+- Sprint 2 continuation on 2026-06-05 added polling-backed device status observability with frontend unit and browser E2E coverage while preserving Sprint 1 closeout status.
+- Sprint 2 continuation on 2026-06-05 added the formal device-key authentication strategy with focused API unit coverage while preserving Sprint 1 closeout status.
+- Sprint 2 continuation on 2026-06-05 added device status-management confirmation and audit-trail controls with frontend unit and browser E2E coverage while preserving Sprint 1 closeout status.
+- Sprint 2 continuation on 2026-06-05 extracted the device registration component with frontend unit and browser E2E coverage while preserving Sprint 1 closeout status.
+- Sprint 2 continuation on 2026-06-05 added browser E2E coverage for device registration, status change, revocation, and ledger-events audit visibility while preserving Sprint 1 closeout status.
+- Sprint 2 continuation on 2026-06-05 added shared-primitives device empty/loading/error states with frontend unit and browser E2E coverage while preserving Sprint 1 closeout status.
+- Sprint 2 continuation on 2026-06-05 added device event visibility coverage from registration through device-event ingestion to the detail audit stream while preserving Sprint 1 closeout status.
+- Sprint 2 continuation on 2026-06-05 added schema-validated device hardware examples, OpenAPI examples, README device setup/testing notes, and the device event ingestion guide while preserving Sprint 1 closeout status.
 
 ---
 

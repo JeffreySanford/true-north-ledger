@@ -31,7 +31,17 @@ describe('RateLimitGuard', () => {
     jest.clearAllMocks();
   });
 
-  function context(method: string): ExecutionContext {
+  function context(
+    method: string,
+    overrides: Partial<{
+      url: string;
+      path: string;
+      routePath: string;
+      user: { userId: string; actorType: string; tenantId: string };
+      forwardedFor: string;
+      ip: string;
+    }> = {},
+  ): ExecutionContext {
     return {
       getHandler: () => jest.fn(),
       getClass: () => jest.fn(),
@@ -39,10 +49,16 @@ describe('RateLimitGuard', () => {
         getRequest: () => ({
           method,
           tenantId: 'tenant-1',
-          url: '/api/v1/ledger/events',
-          headers: { 'user-agent': 'jest', 'x-correlation-id': 'corr-1' },
-          ip: '127.0.0.1',
-          user: {
+          url: overrides.url ?? '/api/v1/ledger/events',
+          path: overrides.path,
+          route: overrides.routePath ? { path: overrides.routePath } : undefined,
+          headers: {
+            'user-agent': 'jest',
+            'x-correlation-id': 'corr-1',
+            ...(overrides.forwardedFor ? { 'x-forwarded-for': overrides.forwardedFor } : {}),
+          },
+          ip: overrides.ip ?? '127.0.0.1',
+          user: overrides.user ?? {
             userId: 'actor-1',
             actorType: 'user',
             tenantId: 'tenant-1',
@@ -118,10 +134,62 @@ describe('RateLimitGuard', () => {
     await expect(guard.canActivate(context('POST'))).resolves.toBe(true);
     await expect(guard.canActivate(context('POST'))).rejects.toBeInstanceOf(HttpException);
     expect(throttlerStorage.increment).toHaveBeenCalledWith(
-      'default:tenant-1:user:actor-1:127.0.0.1',
+      'default:tenant-1:user:actor-1:POST:/api/v1/ledger/events:127.0.0.1',
       1000,
       2,
       1000,
+      'route-limit',
+    );
+  });
+
+  it('separates route buckets and ignores IP for device actors', async () => {
+    reflector.getAllAndOverride.mockReturnValue({ maxRequests: 1, windowMs: 60_000 });
+    throttlerStorage.increment.mockResolvedValue({
+      totalHits: 1,
+      timeToExpire: 60,
+      isBlocked: false,
+      timeToBlockExpire: 0,
+    });
+    const guard = new RateLimitGuard(reflector as never, ledgerEventsService as never, throttlerStorage as never);
+    const deviceUser = {
+      userId: 'device-1',
+      actorType: 'device',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(
+      guard.canActivate(
+        context('POST', {
+          url: '/api/v1/devices/heartbeat',
+          user: deviceUser,
+          forwardedFor: '10.10.10.10',
+        }),
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      guard.canActivate(
+        context('POST', {
+          url: '/api/v1/device-events',
+          user: deviceUser,
+          forwardedFor: '10.10.10.11',
+        }),
+      ),
+    ).resolves.toBe(true);
+
+    expect(throttlerStorage.increment).toHaveBeenNthCalledWith(
+      1,
+      'default:tenant-1:device:device-1:POST:/api/v1/devices/heartbeat:device',
+      60_000,
+      1,
+      60_000,
+      'route-limit',
+    );
+    expect(throttlerStorage.increment).toHaveBeenNthCalledWith(
+      2,
+      'default:tenant-1:device:device-1:POST:/api/v1/device-events:device',
+      60_000,
+      1,
+      60_000,
       'route-limit',
     );
   });

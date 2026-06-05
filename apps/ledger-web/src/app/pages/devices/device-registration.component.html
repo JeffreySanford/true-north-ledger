@@ -1,0 +1,62 @@
+<form class="device-form" [formGroup]="registrationForm" (ngSubmit)="register()" aria-label="Register device">
+  <h2>Register Device</h2>
+
+  <label>
+    <span>Device name</span>
+    <input type="text" formControlName="name" autocomplete="off" />
+  </label>
+
+  <label>
+    <span>Device type</span>
+    <select formControlName="type">
+      @for (type of deviceTypes; track type) {
+        <option [value]="type">{{ type }}</option>
+      }
+    </select>
+  </label>
+
+  <fieldset formGroupName="permissions">
+    <legend>Permissions</legend>
+    @for (option of availablePermissions; track option.permission) {
+      <label class="checkbox-row">
+        <input type="checkbox" formControlName="{{ option.controlName }}" />
+        <span>{{ option.permission }}</span>
+      </label>
+    }
+  </fieldset>
+
+  <label>
+    <span>Metadata JSON</span>
+    <textarea formControlName="metadataJson" rows="5"></textarea>
+  </label>
+
+  <button type="submit" [disabled]="saving || registrationForm.invalid">
+    {{ saving ? 'Registering' : 'Register Device' }}
+  </button>
+</form>
+
+@if (registration) {
+  <section class="api-key-panel" aria-label="One-time device API key">
+    <div class="api-key-panel__details">
+      <h2>{{ registration.name }} API Key</h2>
+      <code>{{ registration.apiKey }}</code>
+      <div class="api-key-panel__actions">
+        <button type="button" (click)="copyApiKey()">{{ copied ? 'Copied' : 'Copy Key' }}</button>
+        <button type="button" (click)="copyProvisioningUri()">Copy QR Payload</button>
+      </div>
+      <p>Store this key now. The server persists only its hash.</p>
+      <p>Scan the QR code to provision heartbeat and event ingestion endpoints on the device.</p>
+    </div>
+    <figure class="api-key-panel__qr" aria-label="Device provisioning QR code">
+      @if (qrCodeDataUrl) {
+        <img [src]="qrCodeDataUrl" alt="QR code for {{ registration.name }} provisioning" />
+      } @else {
+        <div class="api-key-panel__qr-placeholder">QR pending</div>
+      }
+      <figcaption>One-time provisioning QR</figcaption>
+      @if (qrCodeError) {
+        <p class="error-message">QR error: {{ qrCodeError }}</p>
+      }
+    </figure>
+  </section>
+}

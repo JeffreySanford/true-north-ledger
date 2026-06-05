@@ -40,31 +40,47 @@ function hasCommand(command, args = ['--version']) {
   return result.status === 0;
 }
 
+function pnpmSpawn(scriptName) {
+  if (process.platform === 'win32') {
+    return {
+      command: process.env.ComSpec ?? 'cmd.exe',
+      args: ['/d', '/s', '/c', 'pnpm', scriptName],
+    };
+  }
+
+  return {
+    command: 'pnpm',
+    args: [scriptName],
+  };
+}
+
 function startWeb() {
-  if (hasCommand('bash')) {
+  if (process.platform !== 'win32' && hasCommand('bash')) {
     return spawn('bash', ['-lc', 'pnpm start:web'], {
       stdio: 'inherit',
       shell: false,
     });
   }
 
-  return spawn('pnpm', ['start:web'], {
+  const pnpm = pnpmSpawn('start:web');
+  return spawn(pnpm.command, pnpm.args, {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    shell: false,
   });
 }
 
 function startApi() {
-  if (hasCommand('bash')) {
+  if (process.platform !== 'win32' && hasCommand('bash')) {
     return spawn('bash', ['-lc', 'pnpm start:api'], {
       stdio: 'inherit',
       shell: false,
     });
   }
 
-  return spawn('pnpm', ['start:api'], {
+  const pnpm = pnpmSpawn('start:api');
+  return spawn(pnpm.command, pnpm.args, {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    shell: false,
   });
 }
 
@@ -95,6 +111,13 @@ async function main() {
 
   const forwardSignal = (signal) => {
     if (!child.killed) {
+      if (process.platform === 'win32' && child.pid) {
+        spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+          stdio: 'ignore',
+        });
+        return;
+      }
+
       child.kill(signal);
     }
   };
