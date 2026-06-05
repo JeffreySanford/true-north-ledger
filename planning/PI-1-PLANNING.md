@@ -193,10 +193,10 @@ flowchart LR
 - [ ] Add OpenAPI documentation for order endpoints
 
 #### Contract Updates
-- [ ] Create order schemas in shared-models (CreateOrderDto, UpdateOrderDto, OrderResponse)
-- [ ] Add order status enum
-- [ ] Define order item schemas
-- [ ] Add order proof schema
+- [x] Create order schemas in shared-models/order-contracts (CreateOrderRequest, OrderStatusUpdateRequest, OrderResponse)
+- [x] Add order status enum
+- [x] Define order item schemas
+- [x] Add order proof schema
 
 #### Frontend Orders Management
 - [ ] Create `OrderService` in ledger-web

@@ -8,7 +8,7 @@ The product goal is simple: every actor has an identity, and every meaningful ac
 
 This repository is an Nx workspace using pnpm.
 
-**Current Status:** Sprint 0 remediation and Sprint 1 authentication/RBAC foundation are complete. PI-1 Sprint 2 device-management delivery is in progress with device registration, authentication, heartbeat, event ingestion, revocation, QR provisioning, and registry UI flows implemented locally.
+**Current Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, and Sprint 2 device management are complete and pushed. Sprint 3 order-management work has started with shared order contracts and schema tests.
 
 Implemented now:
 
@@ -19,6 +19,7 @@ Implemented now:
 - `libs/ledger-contracts` - Core Zod schemas for ledger events and metadata
 - `libs/auth-contracts` - Actor type and permission schemas  
 - `libs/device-contracts` - Device ledger event schemas
+- `libs/order-contracts` - Order lifecycle, timeline, and proof schemas
 - `libs/audit-contracts` - Audit metadata schemas
 - Docker Compose infrastructure (PostgreSQL, Redis, PgAdmin)
 
@@ -29,8 +30,8 @@ Implemented now:
 - Lint/build/audit: passing cleanly
 
 **Remaining Product Gaps:**
-1. Sprint 2 device integration guides and development deployment signoff remain before formal closeout.
-2. Orders, inventory, public proofs, WebSockets, and production monitoring remain PI-1 roadmap work.
+1. Sprint 3 orders backend, frontend, proof, and E2E workflows remain in active development.
+2. Inventory, public proof pages, WebSockets, and production monitoring remain PI-1 roadmap work.
 3. Browser auth can move from storage-backed bearer tokens toward secure cookie sessions when API/client constraints allow.
 
 **Architecture:**
@@ -232,6 +233,20 @@ pnpm nx test ledger-web -- --include apps/ledger-web/src/app/pages/devices/devic
 pnpm nx e2e ledger-web-e2e -- apps/ledger-web-e2e/src/devices.spec.ts
 ```
 
+## Order Management Setup
+
+Sprint 3 order-management work starts with shared contracts. Backend and frontend order workflows are not active yet, but the order schemas are available through `@true-north-ledger/order-contracts` and `@true-north-ledger/shared-models`.
+
+Order contract validation commands:
+
+```sh
+pnpm nx run order-contracts:lint
+pnpm nx run order-contracts:build
+pnpm nx run shared-models:test --coverage
+```
+
+Order lifecycle and proof contract details are documented in [Order Management](documentation/platform/order-management.md).
+
 ## Auth Testing Instructions
 
 Run auth-related backend tests:
@@ -255,7 +270,7 @@ pnpm nx e2e ledger-web-e2e -- --grep "login|refresh|unauthorized|permission"
 
 ## Project Planning & Roadmap
 
-**Current Phase:** PI-1 / Sprint 1 in progress
+**Current Phase:** PI-1 / Sprint 3 started
 
 ### Planning Documents
 
@@ -308,6 +323,7 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 - [Device Ingestion](documentation/platform/device-ingestion.md)
 - [Device Management](documentation/platform/device-management.md)
 - [Device Event Ingestion Guide](documentation/platform/device-event-ingestion-guide.md)
+- [Order Management](documentation/platform/order-management.md)
 - [Security Model](documentation/platform/security-model.md)
 - [RBAC and Role-Specific Views](documentation/platform/rbac-and-views.md)
 - [Service Token Management](documentation/platform/service-token-management.md)

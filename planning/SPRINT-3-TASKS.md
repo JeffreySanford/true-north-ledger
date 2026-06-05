@@ -2,7 +2,7 @@
 
 **Sprint Duration:** 2 weeks (July 1 - July 14, 2026)  
 **Sprint Goal:** Implement order lifecycle management with full ledger audit trail and proof generation.
-**Status:** Planned (not started as of 2026-06-04)
+**Status:** Started early on 2026-06-05 with order contracts, shared exports, documentation, and schema tests.
 
 ---
 
@@ -107,16 +107,16 @@
   - [ ] Return matching orders with pagination
 
 ### Order Ledger Events
-- [ ] Create order event types in shared-models
-  - [ ] ORDER_CREATED
-  - [ ] ORDER_STATUS_CHANGED
-  - [ ] ORDER_CONFIRMED
-  - [ ] ORDER_PROCESSING
-  - [ ] ORDER_SHIPPED
-  - [ ] ORDER_DELIVERED
-  - [ ] ORDER_CANCELLED
-  - [ ] ORDER_PAYMENT_RECEIVED
-  - [ ] ORDER_REFUND_ISSUED
+- [x] Create order event types in shared-models
+  - [x] ORDER_CREATED
+  - [x] ORDER_STATUS_CHANGED
+  - [x] ORDER_CONFIRMED
+  - [x] ORDER_PROCESSING
+  - [x] ORDER_SHIPPED
+  - [x] ORDER_DELIVERED
+  - [x] ORDER_CANCELLED
+  - [x] ORDER_PAYMENT_RECEIVED
+  - [x] ORDER_REFUND_ISSUED
 - [ ] Ensure all order events include correlation ID
 - [ ] Add order number to all order events
 - [ ] Include customer ID in actor metadata
@@ -216,23 +216,23 @@
 ## Contract Library Updates
 
 ### Order Contracts Creation
-- [ ] Create new `order-contracts` library
-- [ ] Create order creation schema (customer, items, addresses)
-- [ ] Add order item schema (sku, quantity, price, name)
-- [ ] Create order status enum
-- [ ] Add order update schema
-- [ ] Create order response schema
-- [ ] Add order search filter schema
-- [ ] Create order proof schema
-- [ ] Add order timeline event schema
-- [ ] Export all schemas from order-contracts index
+- [x] Create new `order-contracts` library
+- [x] Create order creation schema (customer, items, addresses)
+- [x] Add order item schema (sku, quantity, price, name)
+- [x] Create order status enum
+- [x] Add order update schema
+- [x] Create order response schema
+- [x] Add order search filter schema
+- [x] Create order proof schema
+- [x] Add order timeline event schema
+- [x] Export all schemas from order-contracts index
 
 ### Shared Models Updates
-- [ ] Add Order type definition
-- [ ] Add OrderItem type definition
-- [ ] Add OrderStatus type definition
-- [ ] Add OrderProof type definition
-- [ ] Create order error types
+- [x] Add Order type definition
+- [x] Add OrderItem type definition
+- [x] Add OrderStatus type definition
+- [x] Add OrderProof type definition
+- [x] Create order error types
 
 ---
 
@@ -432,10 +432,10 @@
 ## Documentation
 
 ### Technical Documentation
-- [ ] Document order lifecycle and status transitions
+- [x] Document order lifecycle and status transitions
 - [ ] Add order creation guide
-- [ ] Document proof generation process
-- [ ] Create correlation ID usage guide
+- [x] Document proof generation process
+- [x] Create correlation ID usage guide
 - [ ] Document order search capabilities
 - [ ] Add order API workflow diagrams
 - [ ] Document order lifecycle rail, completeness rail, milestone badge, and proof indicator state model
@@ -448,7 +448,7 @@
 - [ ] Document proof verification process
 
 ### README Updates
-- [ ] Add order management setup instructions
+- [x] Add order management setup instructions
 - [ ] Document order environment variables
 - [ ] Add order testing instructions
 - [ ] Update architecture diagram with order flow
@@ -456,6 +456,21 @@
 ---
 
 ## Definition of Done
+
+**Current local gate check:** 2026-06-05
+
+Current completed slice:
+- Created `libs/order-contracts` with schemas and exported types for creation, items, addresses, statuses, status updates, cancellation, search, timeline events, order detail responses, proofs, proof verification, examples, and order errors.
+- Re-exported order contracts from `libs/shared-models`.
+- Added shared-models unit tests covering schema-valid order examples, lifecycle statuses, ledger actions, and malformed status target rejection.
+- Added initial order-management documentation and aligned README/API docs with the Sprint 3 contract foundation.
+
+Local gate results:
+- [x] `pnpm nx run shared-models:test --coverage --skip-nx-cache` - 13 tests passed
+- [x] `pnpm nx run order-contracts:lint --skip-nx-cache`
+- [x] `pnpm nx run shared-models:lint --skip-nx-cache`
+- [x] `pnpm nx run order-contracts:build --skip-nx-cache`
+- [x] `pnpm nx run shared-models:build --skip-nx-cache`
 
 A task is considered complete when:
 - [ ] Code written and follows coding standards

@@ -1,0 +1,20 @@
+{
+  "name": "order-contracts",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/order-contracts/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:order"],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/order-contracts",
+        "main": "libs/order-contracts/src/index.ts",
+        "tsConfig": "libs/order-contracts/tsconfig.lib.json",
+        "assets": ["libs/order-contracts/*.md"],
+        "format": ["cjs"]
+      }
+    }
+  }
+}

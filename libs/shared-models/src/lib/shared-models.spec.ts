@@ -1,9 +1,16 @@
 import {
   AuthErrorSchema,
+  CreateOrderRequestExample,
+  CreateOrderRequestSchema,
   DeviceEventRequestSchema,
   DeviceHardwareExamples,
   DeviceRegistrationRequestSchema,
   DeviceTypeSchema,
+  OrderExample,
+  OrderLedgerEventActionSchema,
+  OrderSchema,
+  OrderStatusSchema,
+  OrderStatusUpdateRequestSchema,
   PermissionSchema,
   RateLimitErrorSchema,
   RoleSchema,
@@ -128,5 +135,48 @@ describe('shared-models', () => {
     const nonces = Object.values(DeviceHardwareExamples).map((example) => example.event.nonce);
 
     expect(new Set(nonces).size).toBe(nonces.length);
+  });
+
+  it('exports schema-valid order examples for Sprint 3 API documentation', () => {
+    const request = CreateOrderRequestSchema.parse(CreateOrderRequestExample);
+    const order = OrderSchema.parse(OrderExample);
+
+    expect(request.items).toHaveLength(1);
+    expect(order.orderNumber).toMatch(/^ORD-\d{8}-\d{4}$/);
+    expect(order.correlationId).toMatch(/[0-9a-f-]{36}/);
+    expect(order.totalAmount).toBe(
+      order.items.reduce((total, item) => total + item.quantity * item.unitPrice, 0),
+    );
+  });
+
+  it('defines the order lifecycle and ledger actions required by the PI plan', () => {
+    expect(OrderStatusSchema.options).toEqual([
+      'pending',
+      'confirmed',
+      'processing',
+      'shipped',
+      'delivered',
+      'cancelled',
+      'failed',
+    ]);
+    expect(OrderLedgerEventActionSchema.options).toEqual(
+      expect.arrayContaining([
+        'ORDER_CREATED',
+        'ORDER_STATUS_CHANGED',
+        'ORDER_CONFIRMED',
+        'ORDER_PROCESSING',
+        'ORDER_SHIPPED',
+        'ORDER_DELIVERED',
+        'ORDER_CANCELLED',
+      ]),
+    );
+  });
+
+  it('validates order status update reasons and rejects malformed targets', () => {
+    expect(OrderStatusUpdateRequestSchema.parse({ status: 'confirmed', reason: 'customer approved' })).toEqual({
+      status: 'confirmed',
+      reason: 'customer approved',
+    });
+    expect(() => OrderStatusUpdateRequestSchema.parse({ status: 'draft' })).toThrow();
   });
 });

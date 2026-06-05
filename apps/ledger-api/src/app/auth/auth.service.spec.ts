@@ -24,9 +24,15 @@ describe('AuthService', () => {
       JWT_REFRESH_EXPIRATION: '1d',
     };
 
-    const jwtSecret = process.env.JWT_SECRET ?? 'test-secret-000000000000000000000000000000';
+    const jwtSecret =
+      process.env.JWT_SECRET ?? 'test-secret-000000000000000000000000000000';
     testingModule = await Test.createTestingModule({
-      imports: [JwtModule.register({ secret: jwtSecret, signOptions: { expiresIn: '1h' } })],
+      imports: [
+        JwtModule.register({
+          secret: jwtSecret,
+          signOptions: { expiresIn: '1h' },
+        }),
+      ],
       providers: [
         AuthService,
         {
@@ -46,7 +52,8 @@ describe('AuthService', () => {
     }).compile();
 
     service = testingModule.get<AuthService>(AuthService);
-    ledgerEventsService = testingModule.get<LedgerEventsService>(LedgerEventsService);
+    ledgerEventsService =
+      testingModule.get<LedgerEventsService>(LedgerEventsService);
   });
 
   afterEach(async () => {
@@ -64,24 +71,40 @@ describe('AuthService', () => {
   }
 
   it('logs in with valid credentials and returns tokens', async () => {
-    const response = await awaitSingle(service.login({ username: 'test-user', password: 'test-password' }));
+    const response = await awaitSingle(
+      service.login({ username: 'test-user', password: 'test-password' }),
+    );
 
     expect(response.user.username).toBe('test-user');
-    expect(response.user.permissions).toEqual(expect.arrayContaining(['ledger.read', 'ledger.write', 'ledger.audit']));
-    expect(response.accessToken).toMatch(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/);
-    expect(response.refreshToken).toMatch(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/);
+    expect(response.user.permissions).toEqual(
+      expect.arrayContaining(['ledger.read', 'ledger.write', 'ledger.audit']),
+    );
+    expect(response.accessToken).toMatch(
+      /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/,
+    );
+    expect(response.refreshToken).toMatch(
+      /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/,
+    );
     expect(ledgerEventsService.appendEvent).toHaveBeenCalled();
   });
 
   it('captures source IP, user agent, and correlation id metadata for login events', async () => {
-    await awaitSingle(service.login(
-      { username: 'test-user', password: 'test-password' },
-      { sourceIp: '10.20.30.40', userAgent: 'jest-auth-service', correlationId: 'corr-login-metadata' },
-    ));
+    await awaitSingle(
+      service.login(
+        { username: 'test-user', password: 'test-password' },
+        {
+          sourceIp: '10.20.30.40',
+          userAgent: 'jest-auth-service',
+          correlationId: 'corr-login-metadata',
+        },
+      ),
+    );
 
     expect(ledgerEventsService.appendEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        payload: expect.objectContaining({ action: AuthLedgerEventAction.LOGIN_SUCCESS }),
+        payload: expect.objectContaining({
+          action: AuthLedgerEventAction.LOGIN_SUCCESS,
+        }),
       }),
       expect.objectContaining({ userId: 'admin', actorType: 'user' }),
       '00000000-0000-0000-0000-000000000000',
@@ -108,7 +131,10 @@ describe('AuthService', () => {
         type: 'LEDGER_EVENT',
         subjectType: 'auth',
         subjectId: 'test-user',
-        payload: expect.objectContaining({ action: AuthLedgerEventAction.LOGIN_FAILED, username: 'test-user' }),
+        payload: expect.objectContaining({
+          action: AuthLedgerEventAction.LOGIN_FAILED,
+          username: 'test-user',
+        }),
       }),
       expect.any(Object),
       '00000000-0000-0000-0000-000000000000',
@@ -117,9 +143,13 @@ describe('AuthService', () => {
   });
 
   it('refreshes tokens with a valid refresh token', async () => {
-    const loginResponse = await awaitSingle(service.login({ username: 'test-user', password: 'test-password' }));
+    const loginResponse = await awaitSingle(
+      service.login({ username: 'test-user', password: 'test-password' }),
+    );
 
-    const refreshed = await awaitSingle(service.refresh(loginResponse.refreshToken));
+    const refreshed = await awaitSingle(
+      service.refresh(loginResponse.refreshToken),
+    );
 
     expect(refreshed.user.username).toBe('test-user');
     expect(refreshed.accessToken).not.toBe(loginResponse.accessToken);
@@ -127,17 +157,23 @@ describe('AuthService', () => {
   });
 
   it('captures source IP, user agent, and correlation id metadata for refresh events', async () => {
-    const loginResponse = await awaitSingle(service.login({ username: 'test-user', password: 'test-password' }));
+    const loginResponse = await awaitSingle(
+      service.login({ username: 'test-user', password: 'test-password' }),
+    );
 
-    await awaitSingle(service.refresh(loginResponse.refreshToken, {
-      sourceIp: '10.20.30.41',
-      userAgent: 'jest-auth-service-refresh',
-      correlationId: 'corr-refresh-metadata',
-    }));
+    await awaitSingle(
+      service.refresh(loginResponse.refreshToken, {
+        sourceIp: '10.20.30.41',
+        userAgent: 'jest-auth-service-refresh',
+        correlationId: 'corr-refresh-metadata',
+      }),
+    );
 
     expect(ledgerEventsService.appendEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        payload: expect.objectContaining({ action: AuthLedgerEventAction.TOKEN_REFRESHED }),
+        payload: expect.objectContaining({
+          action: AuthLedgerEventAction.TOKEN_REFRESHED,
+        }),
       }),
       expect.objectContaining({ userId: 'admin', actorType: 'user' }),
       '00000000-0000-0000-0000-000000000000',
@@ -150,8 +186,12 @@ describe('AuthService', () => {
   });
 
   it('rotates refresh tokens and invalidates the previous refresh token', async () => {
-    const loginResponse = await awaitSingle(service.login({ username: 'test-user', password: 'test-password' }));
-    const refreshedOnce = await awaitSingle(service.refresh(loginResponse.refreshToken));
+    const loginResponse = await awaitSingle(
+      service.login({ username: 'test-user', password: 'test-password' }),
+    );
+    const refreshedOnce = await awaitSingle(
+      service.refresh(loginResponse.refreshToken),
+    );
 
     await expect(
       new Promise((resolve, reject) =>
@@ -162,18 +202,24 @@ describe('AuthService', () => {
       ),
     ).rejects.toThrow('Refresh token is invalid or revoked');
 
-    const refreshedTwice = await awaitSingle(service.refresh(refreshedOnce.refreshToken));
+    const refreshedTwice = await awaitSingle(
+      service.refresh(refreshedOnce.refreshToken),
+    );
     expect(refreshedTwice.accessToken).not.toBe(refreshedOnce.accessToken);
   });
 
   it('revokes refresh token on logout', async () => {
-    const loginResponse = await awaitSingle(service.login({ username: 'test-user', password: 'test-password' }));
+    const loginResponse = await awaitSingle(
+      service.login({ username: 'test-user', password: 'test-password' }),
+    );
 
     await new Promise<void>((resolve, reject) =>
-      service.logout(loginResponse.refreshToken, loginResponse.accessToken).subscribe({
-        next: () => resolve(),
-        error: reject,
-      }),
+      service
+        .logout(loginResponse.refreshToken, loginResponse.accessToken)
+        .subscribe({
+          next: () => resolve(),
+          error: reject,
+        }),
     );
     await expect(
       new Promise((resolve, reject) =>
@@ -188,7 +234,9 @@ describe('AuthService', () => {
       expect.objectContaining({
         type: 'LEDGER_EVENT',
         subjectType: 'auth',
-        payload: expect.objectContaining({ action: AuthLedgerEventAction.LOGOUT }),
+        payload: expect.objectContaining({
+          action: AuthLedgerEventAction.LOGOUT,
+        }),
       }),
       expect.any(Object),
       '00000000-0000-0000-0000-000000000000',
@@ -196,11 +244,49 @@ describe('AuthService', () => {
     );
   });
 
+  it('waits for logout audit event to append before completing logout', async () => {
+    const loginResponse = await awaitSingle(
+      service.login({ username: 'test-user', password: 'test-password' }),
+    );
+    let appendObserver:
+      | {
+          next(value: unknown): void;
+          complete(): void;
+        }
+      | undefined;
+    jest.spyOn(ledgerEventsService, 'appendEvent').mockReturnValue(
+      new Observable<unknown>((observer) => {
+        appendObserver = observer;
+      }),
+    );
+
+    let logoutCompleted = false;
+    const logoutPromise = awaitSingle(
+      service.logout(loginResponse.refreshToken, loginResponse.accessToken),
+    ).then(() => {
+      logoutCompleted = true;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(logoutCompleted).toBe(false);
+    expect(appendObserver).toBeDefined();
+
+    appendObserver?.next({});
+    appendObserver?.complete();
+    await logoutPromise;
+
+    expect(logoutCompleted).toBe(true);
+  });
+
   it('creates and revokes a service token', async () => {
-    const createResponse = await awaitSingle(service.createServiceToken({
-      name: 'integration-service',
-      permissions: ['ledger.read'],
-    }));
+    const createResponse = await awaitSingle(
+      service.createServiceToken({
+        name: 'integration-service',
+        permissions: ['ledger.read'],
+      }),
+    );
 
     expect(createResponse.id).toBeTruthy();
     expect(createResponse.token).toBeTruthy();
@@ -218,7 +304,9 @@ describe('AuthService', () => {
       }),
     );
 
-    await expect(service.verifyServiceToken(createResponse.token)).rejects.toThrow('Invalid or revoked service token');
+    await expect(
+      service.verifyServiceToken(createResponse.token),
+    ).rejects.toThrow('Invalid or revoked service token');
   });
 
   it('resolves permissions from assigned roles when actor permissions are empty', () => {
@@ -228,19 +316,29 @@ describe('AuthService', () => {
       permissions: [],
     });
 
-    expect(resolved).toEqual(expect.arrayContaining(['ledger.read', 'ledger.audit', 'proof.read']));
+    expect(resolved).toEqual(
+      expect.arrayContaining(['ledger.read', 'ledger.audit', 'proof.read']),
+    );
     expect(resolved).not.toContain('users.manage');
   });
 
   it('assigns user roles and records role assignment audit event', async () => {
-    const result = await awaitSingle(service.assignUserRoles(
-      'ops-user-1',
-      { username: 'ops.manager', roles: ['operations_manager', 'viewer'] },
-      { userId: 'admin', actorType: 'user', tenantId: '00000000-0000-0000-0000-000000000000' },
-    ));
+    const result = await awaitSingle(
+      service.assignUserRoles(
+        'ops-user-1',
+        { username: 'ops.manager', roles: ['operations_manager', 'viewer'] },
+        {
+          userId: 'admin',
+          actorType: 'user',
+          tenantId: '00000000-0000-0000-0000-000000000000',
+        },
+      ),
+    );
 
     expect(result.roles).toEqual(['operations_manager', 'viewer']);
-    expect(result.permissions).toEqual(expect.arrayContaining(['ledger.read', 'orders.read', 'shipping.read']));
+    expect(result.permissions).toEqual(
+      expect.arrayContaining(['ledger.read', 'orders.read', 'shipping.read']),
+    );
     expect(result.active).toBe(true);
     expect(ledgerEventsService.appendEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -256,18 +354,28 @@ describe('AuthService', () => {
   });
 
   it('deactivates user and blocks future active-state checks', async () => {
-    const result = await awaitSingle(service.deactivateUser(
-      'ops-user-1',
-      { reason: 'Security hold' },
-      { userId: 'admin', actorType: 'user', tenantId: '00000000-0000-0000-0000-000000000000' },
-    ));
+    const result = await awaitSingle(
+      service.deactivateUser(
+        'ops-user-1',
+        { reason: 'Security hold' },
+        {
+          userId: 'admin',
+          actorType: 'user',
+          tenantId: '00000000-0000-0000-0000-000000000000',
+        },
+      ),
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      userId: 'ops-user-1',
-      active: false,
-      reason: 'Security hold',
-    }));
-    expect(service.isActorActive({ userId: 'ops-user-1', actorType: 'user' })).toBe(false);
+    expect(result).toEqual(
+      expect.objectContaining({
+        userId: 'ops-user-1',
+        active: false,
+        reason: 'Security hold',
+      }),
+    );
+    expect(
+      service.isActorActive({ userId: 'ops-user-1', actorType: 'user' }),
+    ).toBe(false);
     expect(ledgerEventsService.appendEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({ action: 'USER_DEACTIVATED' }),
@@ -279,18 +387,26 @@ describe('AuthService', () => {
   });
 
   it('rejects login for deactivated seeded user', async () => {
-    await awaitSingle(service.deactivateUser(
-      'admin',
-      { reason: 'Access removed' },
-      { userId: 'admin', actorType: 'user', tenantId: '00000000-0000-0000-0000-000000000000' },
-    ));
+    await awaitSingle(
+      service.deactivateUser(
+        'admin',
+        { reason: 'Access removed' },
+        {
+          userId: 'admin',
+          actorType: 'user',
+          tenantId: '00000000-0000-0000-0000-000000000000',
+        },
+      ),
+    );
 
     await expect(
       new Promise((resolve, reject) =>
-        service.login({ username: 'test-user', password: 'test-password' }).subscribe({
-          next: resolve,
-          error: reject,
-        }),
+        service
+          .login({ username: 'test-user', password: 'test-password' })
+          .subscribe({
+            next: resolve,
+            error: reject,
+          }),
       ),
     ).rejects.toThrow('User is deactivated');
   });

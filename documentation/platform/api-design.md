@@ -25,7 +25,7 @@ Role and permission checks must happen before business writes. UI route gating i
 
 ## Schema Contracts
 
-Requests and responses are validated by shared Zod schemas in `libs/shared-models` and `libs/ledger-contracts`. This ensures the frontend and API agree on event shape, metadata requirements, and audit fields.
+Requests and responses are validated by shared Zod schemas in `libs/shared-models` and focused contract libraries such as `libs/ledger-contracts`, `libs/device-contracts`, and `libs/order-contracts`. This ensures the frontend and API agree on event shape, metadata requirements, and audit fields.
 
 ```mermaid
 flowchart TD

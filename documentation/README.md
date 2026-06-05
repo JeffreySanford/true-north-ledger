@@ -20,6 +20,7 @@ Documentation is grouped by topic so project intent, platform design, operations
 - [Device Ingestion](platform/device-ingestion.md)
 - [Device Management](platform/device-management.md)
 - [Device Event Ingestion Guide](platform/device-event-ingestion-guide.md)
+- [Order Management](platform/order-management.md)
 - [Security Model](platform/security-model.md)
 - [RBAC and Role-Specific Views](platform/rbac-and-views.md)
 - [Service Token Management](platform/service-token-management.md)

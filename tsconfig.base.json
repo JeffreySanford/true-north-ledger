@@ -22,6 +22,7 @@
       "@true-north-ledger/ledger-contracts": ["./libs/ledger-contracts/src/index.ts"],
       "@true-north-ledger/auth-contracts": ["./libs/auth-contracts/src/index.ts"],
       "@true-north-ledger/device-contracts": ["./libs/device-contracts/src/index.ts"],
+      "@true-north-ledger/order-contracts": ["./libs/order-contracts/src/index.ts"],
       "@true-north-ledger/audit-contracts": ["./libs/audit-contracts/src/index.ts"]
     }
   },

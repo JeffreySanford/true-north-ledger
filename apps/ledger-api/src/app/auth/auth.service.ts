@@ -9,10 +9,13 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { SignOptions } from 'jsonwebtoken';
 import { createHash, randomUUID } from 'crypto';
-import { defer, Observable, of, tap } from 'rxjs';
+import { concatMap, defer, from, map, Observable, of, tap } from 'rxjs';
 import { Repository } from 'typeorm';
 import { AuthLedgerEventAction } from '@true-north-ledger/ledger-contracts';
-import { LedgerEventsService, AuthenticatedLedgerActor } from '../ledger-events/ledger-events.service';
+import {
+  LedgerEventsService,
+  AuthenticatedLedgerActor,
+} from '../ledger-events/ledger-events.service';
 import {
   AuthResponse,
   AuthUser,
@@ -26,7 +29,11 @@ import {
   UserRoleAssignmentResponse,
 } from './auth.dto';
 import { requiredEnv } from '../config/required-env';
-import { ROLE_NAMES, ROLE_PERMISSION_CATALOG, RoleName } from './role-permissions';
+import {
+  ROLE_NAMES,
+  ROLE_PERMISSION_CATALOG,
+  RoleName,
+} from './role-permissions';
 import { ServiceTokenEntity } from './service-token.entity';
 import { TenantRolePermissionEntity } from './tenant-role-permission.entity';
 import { TokenBlacklistService } from './token-blacklist.service';
@@ -80,7 +87,10 @@ export class AuthService implements OnModuleInit {
   private readonly serviceTokenById = new Map<string, ServiceTokenRecord>();
   private readonly usersById = new Map<string, UserRoleRecord>();
   private readonly userIdByUsername = new Map<string, string>();
-  private readonly rolePermissionsByTenant = new Map<string, TenantRolePermissionMap>();
+  private readonly rolePermissionsByTenant = new Map<
+    string,
+    TenantRolePermissionMap
+  >();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -96,18 +106,24 @@ export class AuthService implements OnModuleInit {
     @InjectRepository(UserRoleRecordEntity)
     private readonly userRoleRecordRepository?: Repository<UserRoleRecordEntity>,
   ) {
-    this.allowedUsername = process.env.AUTH_USERNAME ??
+    this.allowedUsername =
+      process.env.AUTH_USERNAME ??
       (process.env.NODE_ENV === 'production'
         ? requiredEnv('AUTH_USERNAME')
         : 'admin');
-    const rawPassword = process.env.AUTH_PASSWORD ??
+    const rawPassword =
+      process.env.AUTH_PASSWORD ??
       (process.env.NODE_ENV === 'production'
         ? requiredEnv('AUTH_PASSWORD')
         : 'admin');
     this.allowedPasswordHash = this.hashPassword(rawPassword);
-    this.tenantId = process.env.AUTH_TENANT_ID ?? '00000000-0000-0000-0000-000000000000';
+    this.tenantId =
+      process.env.AUTH_TENANT_ID ?? '00000000-0000-0000-0000-000000000000';
     this.refreshExpiration = process.env.JWT_REFRESH_EXPIRATION ?? '7d';
-    this.rolePermissionsByTenant.set(this.tenantId, this.getDefaultRolePermissionMap());
+    this.rolePermissionsByTenant.set(
+      this.tenantId,
+      this.getDefaultRolePermissionMap(),
+    );
     this.seedDefaultAdminUser();
   }
 
@@ -118,7 +134,10 @@ export class AuthService implements OnModuleInit {
     await this.loadServiceTokensFromDatabase();
   }
 
-  login(request: LoginRequest, auditContext?: AuthAuditContext): Observable<AuthResponse> {
+  login(
+    request: LoginRequest,
+    auditContext?: AuthAuditContext,
+  ): Observable<AuthResponse> {
     return defer(() => {
       const { username, password } = request;
       if (!this.verifyCredentials(username, password)) {
@@ -138,13 +157,14 @@ export class AuthService implements OnModuleInit {
         accessToken,
         refreshToken,
         user,
-      }).pipe(
-        tap(() => this.appendLoginEvent(user, auditContext)),
-      );
+      }).pipe(tap(() => this.appendLoginEvent(user, auditContext)));
     });
   }
 
-  refresh(refreshToken: string, auditContext?: AuthAuditContext): Observable<AuthResponse> {
+  refresh(
+    refreshToken: string,
+    auditContext?: AuthAuditContext,
+  ): Observable<AuthResponse> {
     return defer(() => {
       const payload = this.verifyRefreshToken(refreshToken);
       const user = this.buildUser(payload.username ?? this.allowedUsername);
@@ -157,14 +177,16 @@ export class AuthService implements OnModuleInit {
         accessToken,
         refreshToken: nextRefreshToken,
         user,
-      }).pipe(
-        tap(() => this.appendRefreshEvent(user, auditContext)),
-      );
+      }).pipe(tap(() => this.appendRefreshEvent(user, auditContext)));
     });
   }
 
-  logout(refreshToken: string, accessToken: string, auditContext?: AuthAuditContext): Observable<void> {
-    return defer(async () => {
+  logout(
+    refreshToken: string,
+    accessToken: string,
+    auditContext?: AuthAuditContext,
+  ): Observable<void> {
+    return defer(() => {
       if (!refreshToken) {
         throw new BadRequestException('Refresh token is required for logout');
       }
@@ -176,8 +198,10 @@ export class AuthService implements OnModuleInit {
       const user = this.buildUser(payload.username ?? this.allowedUsername);
 
       this.revokeRefreshToken(refreshToken);
-      await this.blacklistAccessToken(accessToken);
-      this.appendLogoutEvent(user, auditContext);
+      return from(this.blacklistAccessToken(accessToken)).pipe(
+        concatMap(() => this.appendLogoutEvent(user, auditContext)),
+        map(() => undefined),
+      );
     });
   }
 
@@ -250,7 +274,9 @@ export class AuthService implements OnModuleInit {
   }
 
   private revokeRefreshToken(refreshToken: string): void {
-    const payload = this.jwtService.decode(refreshToken) as { jti?: string } | null;
+    const payload = this.jwtService.decode(refreshToken) as {
+      jti?: string;
+    } | null;
     if (payload?.jti) {
       this.refreshTokenIds.delete(payload.jti);
     }
@@ -273,9 +299,10 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Access token is invalid');
     }
 
-    const ttlSeconds = typeof payload.exp === 'number'
-      ? payload.exp - Math.floor(Date.now() / 1000)
-      : 3600;
+    const ttlSeconds =
+      typeof payload.exp === 'number'
+        ? payload.exp - Math.floor(Date.now() / 1000)
+        : 3600;
     if (ttlSeconds <= 0) {
       return;
     }
@@ -283,7 +310,10 @@ export class AuthService implements OnModuleInit {
     await this.tokenBlacklistService.blacklistJti(payload.jti, ttlSeconds);
   }
 
-  createServiceToken(request: ServiceTokenCreateRequest, auditContext?: AuthAuditContext): Observable<ServiceTokenCreateResponse> {
+  createServiceToken(
+    request: ServiceTokenCreateRequest,
+    auditContext?: AuthAuditContext,
+  ): Observable<ServiceTokenCreateResponse> {
     return defer(async () => {
       const id = randomUUID();
       const rawToken = randomUUID() + '.' + randomUUID();
@@ -313,7 +343,11 @@ export class AuthService implements OnModuleInit {
         });
       }
 
-      this.appendServiceTokenEvent(record, AuthLedgerEventAction.SERVICE_TOKEN_CREATED, auditContext);
+      this.appendServiceTokenEvent(
+        record,
+        AuthLedgerEventAction.SERVICE_TOKEN_CREATED,
+        auditContext,
+      );
 
       return {
         id,
@@ -327,7 +361,10 @@ export class AuthService implements OnModuleInit {
     });
   }
 
-  revokeServiceToken(id: string, auditContext?: AuthAuditContext): Observable<void> {
+  revokeServiceToken(
+    id: string,
+    auditContext?: AuthAuditContext,
+  ): Observable<void> {
     return defer(async () => {
       const record = this.serviceTokenById.get(id);
       if (!record) {
@@ -347,7 +384,11 @@ export class AuthService implements OnModuleInit {
         );
       }
 
-      this.appendServiceTokenEvent(record, AuthLedgerEventAction.SERVICE_TOKEN_REVOKED, auditContext);
+      this.appendServiceTokenEvent(
+        record,
+        AuthLedgerEventAction.SERVICE_TOKEN_REVOKED,
+        auditContext,
+      );
     });
   }
 
@@ -356,7 +397,9 @@ export class AuthService implements OnModuleInit {
     let record = this.serviceTokenByHash.get(hash);
 
     if (!record && this.serviceTokenRepository) {
-      const fromDb = await this.serviceTokenRepository.findOne({ where: { hashedToken: hash } });
+      const fromDb = await this.serviceTokenRepository.findOne({
+        where: { hashedToken: hash },
+      });
       if (fromDb) {
         record = {
           id: fromDb.id,
@@ -415,8 +458,12 @@ export class AuthService implements OnModuleInit {
 
   resolvePermissionsForActor(actor: ResolvedActorContext): string[] {
     const resolvedRoles = this.resolveRolesForActor(actor);
-    const rolePermissionsForTenant = this.getRolePermissionsForTenant(actor.tenantId);
-    const rolePermissions = resolvedRoles.flatMap((role) => rolePermissionsForTenant[role] ?? []);
+    const rolePermissionsForTenant = this.getRolePermissionsForTenant(
+      actor.tenantId,
+    );
+    const rolePermissions = resolvedRoles.flatMap(
+      (role) => rolePermissionsForTenant[role] ?? [],
+    );
     const directPermissions = actor.permissions ?? [];
 
     return Array.from(new Set([...directPermissions, ...rolePermissions]));
@@ -430,7 +477,9 @@ export class AuthService implements OnModuleInit {
     return defer(async () => {
       const roles = this.normalizeRoles(request.roles);
       if (roles.length !== request.roles.length) {
-        throw new BadRequestException(`Unknown roles supplied. Allowed roles: ${ROLE_NAMES.join(', ')}`);
+        throw new BadRequestException(
+          `Unknown roles supplied. Allowed roles: ${ROLE_NAMES.join(', ')}`,
+        );
       }
 
       const existing = this.usersById.get(userId);
@@ -572,7 +621,9 @@ export class AuthService implements OnModuleInit {
       return;
     }
 
-    const rows = await this.userRoleRecordRepository.find({ where: { tenantId: this.tenantId } });
+    const rows = await this.userRoleRecordRepository.find({
+      where: { tenantId: this.tenantId },
+    });
     if (rows.length === 0) {
       return;
     }
@@ -632,7 +683,9 @@ export class AuthService implements OnModuleInit {
     await this.userRoleRecordRepository.save(entity);
   }
 
-  private async ensureRolePermissionSeedForTenant(tenantId: string): Promise<void> {
+  private async ensureRolePermissionSeedForTenant(
+    tenantId: string,
+  ): Promise<void> {
     const defaults = this.getDefaultRolePermissionMap();
 
     if (!this.tenantRolePermissionRepository) {
@@ -640,17 +693,21 @@ export class AuthService implements OnModuleInit {
       return;
     }
 
-    const existing = await this.tenantRolePermissionRepository.find({ where: { tenantId } });
+    const existing = await this.tenantRolePermissionRepository.find({
+      where: { tenantId },
+    });
     const byRole = new Map(existing.map((entry) => [entry.role, entry]));
 
     const missing: TenantRolePermissionEntity[] = [];
     for (const role of ROLE_NAMES) {
       if (!byRole.has(role)) {
-        missing.push(this.tenantRolePermissionRepository.create({
-          tenantId,
-          role,
-          permissions: defaults[role],
-        }));
+        missing.push(
+          this.tenantRolePermissionRepository.create({
+            tenantId,
+            role,
+            permissions: defaults[role],
+          }),
+        );
       }
     }
 
@@ -658,7 +715,9 @@ export class AuthService implements OnModuleInit {
       await this.tenantRolePermissionRepository.save(missing);
     }
 
-    const seeded = await this.tenantRolePermissionRepository.find({ where: { tenantId } });
+    const seeded = await this.tenantRolePermissionRepository.find({
+      where: { tenantId },
+    });
     const nextMap = this.getDefaultRolePermissionMap();
     for (const entry of seeded) {
       if (ROLE_NAMES.includes(entry.role as RoleName)) {
@@ -669,8 +728,13 @@ export class AuthService implements OnModuleInit {
     this.rolePermissionsByTenant.set(tenantId, nextMap);
   }
 
-  private getRolePermissionsForTenant(tenantId: string | undefined): TenantRolePermissionMap {
-    return this.rolePermissionsByTenant.get(tenantId ?? this.tenantId) ?? this.getDefaultRolePermissionMap();
+  private getRolePermissionsForTenant(
+    tenantId: string | undefined,
+  ): TenantRolePermissionMap {
+    return (
+      this.rolePermissionsByTenant.get(tenantId ?? this.tenantId) ??
+      this.getDefaultRolePermissionMap()
+    );
   }
 
   private getDefaultRolePermissionMap(): TenantRolePermissionMap {
@@ -690,7 +754,11 @@ export class AuthService implements OnModuleInit {
 
   private buildUser(username: string): AuthUser {
     const mappedUserId = this.userIdByUsername.get(username) ?? 'admin';
-    const resolvedRoles = this.resolveRolesForActor({ userId: mappedUserId, username, actorType: 'user' });
+    const resolvedRoles = this.resolveRolesForActor({
+      userId: mappedUserId,
+      username,
+      actorType: 'user',
+    });
     const resolvedPermissions = this.resolvePermissionsForActor({
       userId: mappedUserId,
       username,
@@ -736,7 +804,10 @@ export class AuthService implements OnModuleInit {
     return Array.from(new Set(normalized));
   }
 
-  private appendLoginEvent(user: AuthUser, auditContext?: AuthAuditContext): void {
+  private appendLoginEvent(
+    user: AuthUser,
+    auditContext?: AuthAuditContext,
+  ): void {
     const actor: AuthenticatedLedgerActor = {
       userId: user.userId,
       actorType: user.actorType,
@@ -767,38 +838,36 @@ export class AuthService implements OnModuleInit {
       });
   }
 
-  private appendLogoutEvent(user: AuthUser, auditContext?: AuthAuditContext): void {
+  private appendLogoutEvent(
+    user: AuthUser,
+    auditContext?: AuthAuditContext,
+  ): Observable<unknown> {
     const actor: AuthenticatedLedgerActor = {
       userId: user.userId,
       actorType: user.actorType,
       tenantId: user.tenantId,
     };
 
-    this.ledgerEventsService
-      .appendEvent(
-        {
-          type: 'LEDGER_EVENT' as const,
-          subjectType: 'auth',
-          subjectId: user.userId,
-          payload: {
-            action: AuthLedgerEventAction.LOGOUT,
-            username: user.username,
-          },
+    return this.ledgerEventsService.appendEvent(
+      {
+        type: 'LEDGER_EVENT' as const,
+        subjectType: 'auth',
+        subjectId: user.userId,
+        payload: {
+          action: AuthLedgerEventAction.LOGOUT,
+          username: user.username,
         },
-        actor,
-        user.tenantId,
-        this.resolveAuditContext(auditContext),
-      )
-      .subscribe({
-        error: (error) => {
-          if (process.env.NODE_ENV !== 'test') {
-            console.error('Failed to record logout event', error);
-          }
-        },
-      });
+      },
+      actor,
+      user.tenantId,
+      this.resolveAuditContext(auditContext),
+    );
   }
 
-  private appendLoginFailedEvent(username: string, auditContext?: AuthAuditContext): void {
+  private appendLoginFailedEvent(
+    username: string,
+    auditContext?: AuthAuditContext,
+  ): void {
     const actor: AuthenticatedLedgerActor = {
       userId: username || 'unknown',
       actorType: 'user',
@@ -829,7 +898,10 @@ export class AuthService implements OnModuleInit {
       });
   }
 
-  private appendRefreshEvent(user: AuthUser, auditContext?: AuthAuditContext): void {
+  private appendRefreshEvent(
+    user: AuthUser,
+    auditContext?: AuthAuditContext,
+  ): void {
     const actor: AuthenticatedLedgerActor = {
       userId: user.userId,
       actorType: user.actorType,
@@ -862,7 +934,9 @@ export class AuthService implements OnModuleInit {
 
   private appendServiceTokenEvent(
     record: ServiceTokenRecord,
-    action: typeof AuthLedgerEventAction.SERVICE_TOKEN_CREATED | typeof AuthLedgerEventAction.SERVICE_TOKEN_REVOKED,
+    action:
+      | typeof AuthLedgerEventAction.SERVICE_TOKEN_CREATED
+      | typeof AuthLedgerEventAction.SERVICE_TOKEN_REVOKED,
     auditContext?: AuthAuditContext,
   ): void {
     const actor: AuthenticatedLedgerActor = {
@@ -896,7 +970,9 @@ export class AuthService implements OnModuleInit {
       });
   }
 
-  private resolveAuditContext(auditContext?: AuthAuditContext): AuthAuditContext {
+  private resolveAuditContext(
+    auditContext?: AuthAuditContext,
+  ): AuthAuditContext {
     return {
       sourceIp: auditContext?.sourceIp ?? '127.0.0.1',
       userAgent: auditContext?.userAgent ?? 'auth-service',
