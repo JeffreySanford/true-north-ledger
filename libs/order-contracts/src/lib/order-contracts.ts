@@ -115,12 +115,17 @@ export const OrderListResponseSchema = z.object({
   pageSize: z.number().int().positive(),
 });
 
+export const OrderActorMetadataSchema = z.object({
+  customerId: z.string().min(1),
+});
+
 export const OrderTimelineEventSchema = z.object({
   eventId: z.string().uuid(),
   eventType: OrderLedgerEventActionSchema,
   orderId: z.string().uuid(),
   orderNumber: z.string().min(1),
   correlationId: z.string().uuid(),
+  actorMetadata: OrderActorMetadataSchema,
   status: OrderStatusSchema.optional(),
   previousStatus: OrderStatusSchema.optional(),
   reason: z.string().min(1).optional(),
@@ -153,6 +158,12 @@ export const OrderProofVerificationResponseSchema = z.object({
   proofHash: z.string().min(1),
   verifiedAt: z.string().datetime(),
   reason: z.string().min(1).optional(),
+});
+
+export const OrderRealtimeEventSchema = z.object({
+  type: z.enum(['created', 'status_changed', 'cancelled']),
+  order: OrderSchema,
+  occurredAt: z.string().datetime(),
 });
 
 export const OrderErrorCodeSchema = z.enum([
@@ -242,10 +253,12 @@ export type Order = z.infer<typeof OrderSchema>;
 export type OrderSummary = z.infer<typeof OrderSummarySchema>;
 export type OrderSearchRequest = z.infer<typeof OrderSearchRequestSchema>;
 export type OrderListResponse = z.infer<typeof OrderListResponseSchema>;
+export type OrderActorMetadata = z.infer<typeof OrderActorMetadataSchema>;
 export type OrderTimelineEvent = z.infer<typeof OrderTimelineEventSchema>;
 export type OrderDetailResponse = z.infer<typeof OrderDetailResponseSchema>;
 export type OrderProof = z.infer<typeof OrderProofSchema>;
 export type OrderProofVerificationRequest = z.infer<typeof OrderProofVerificationRequestSchema>;
 export type OrderProofVerificationResponse = z.infer<typeof OrderProofVerificationResponseSchema>;
+export type OrderRealtimeEvent = z.infer<typeof OrderRealtimeEventSchema>;
 export type OrderErrorCode = z.infer<typeof OrderErrorCodeSchema>;
 export type OrderError = z.infer<typeof OrderErrorSchema>;

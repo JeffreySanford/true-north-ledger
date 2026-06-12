@@ -17,7 +17,10 @@
             routerLinkActive="active"
             [routerLinkActiveOptions]="{ exact: item.exact === true }"
           >
-            {{ item.label }}
+            <span>{{ item.label }}</span>
+            @if (item.route === '/orders' && orderCount !== null) {
+              <span class="nav-badge" data-testid="orders-nav-badge" aria-label="Order count">{{ orderCount }}</span>
+            }
           </a>
         }
       }

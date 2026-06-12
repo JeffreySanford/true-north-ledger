@@ -11,6 +11,7 @@ import {
   OrderSchema,
   OrderStatusSchema,
   OrderStatusUpdateRequestSchema,
+  OrderTimelineEventSchema,
   PermissionSchema,
   RateLimitErrorSchema,
   RoleSchema,
@@ -178,5 +179,26 @@ describe('shared-models', () => {
       reason: 'customer approved',
     });
     expect(() => OrderStatusUpdateRequestSchema.parse({ status: 'draft' })).toThrow();
+  });
+
+  it('requires customer identity in order timeline actor metadata', () => {
+    const event = OrderTimelineEventSchema.parse({
+      eventId: '55555555-5555-4555-8555-555555555555',
+      eventType: 'ORDER_CREATED',
+      orderId: OrderExample.id,
+      orderNumber: OrderExample.orderNumber,
+      correlationId: OrderExample.correlationId,
+      actorMetadata: { customerId: OrderExample.customerId },
+      status: 'pending',
+      actorType: 'user',
+      actorId: 'admin',
+      result: 'accepted',
+      timestamp: OrderExample.createdAt,
+    });
+
+    expect(event.actorMetadata.customerId).toBe(OrderExample.customerId);
+    expect(() =>
+      OrderTimelineEventSchema.parse({ ...event, actorMetadata: {} }),
+    ).toThrow();
   });
 });

@@ -1,0 +1,84 @@
+<section class="orders-header">
+  <button type="button" class="secondary-button" (click)="backToOrders()">Back to orders</button>
+  <div>
+    <h1 class="page-heading">{{ order?.orderNumber ?? 'Order detail' }}</h1>
+    <p>Lifecycle controls, timeline reconstruction, correlation ID, and proof verification.</p>
+    <p data-testid="order-realtime-state">
+      Real-time updates: {{ (orderRealtime.connected$ | async) ? 'connected' : 'disconnected' }}
+    </p>
+  </div>
+</section>
+
+@if (error) {
+  <div class="order-state" data-testid="order-detail-error">
+    <tnl-connection-status label="Order detail" state="failed" [detail]="error"></tnl-connection-status>
+  </div>
+}
+
+@if (loading) {
+  <p class="loading-state">Loading order detail</p>
+} @else if (order) {
+  <section class="order-detail-grid" data-testid="order-detail">
+    <article class="order-panel">
+      <div class="panel-header">
+        <h2>Status</h2>
+        <div>
+          <tnl-order-status-icon [status]="order.status"></tnl-order-status-icon>
+          <tnl-status-chip [label]="order.status" stateText="Server backed" [tone]="statusTone(order.status)"></tnl-status-chip>
+        </div>
+      </div>
+      <tnl-progress-rail title="Order lifecycle" [steps]="lifecycleSteps(order)"></tnl-progress-rail>
+      <dl>
+        <div><dt>Customer</dt><dd>{{ order.customerName }} ({{ order.customerId }})</dd></div>
+        <div><dt>Total</dt><dd>{{ formatMoney(order) }}</dd></div>
+        <div><dt>Correlation ID</dt><dd>{{ order.correlationId }}</dd></div>
+        <div><dt>Created</dt><dd>{{ order.createdAt }}</dd></div>
+      </dl>
+      @if (printActionMessage) {
+        <p class="success-message" data-testid="order-print-message">{{ printActionMessage }}</p>
+      }
+      <div class="detail-actions">
+        <label>
+          <span>Status reason</span>
+          <input [(ngModel)]="statusReason" [ngModelOptions]="{ standalone: true }" />
+        </label>
+        <button type="button" (click)="advanceStatus()" [disabled]="!nextStatus">
+          {{ nextStatus ? 'Mark ' + nextStatus : 'Lifecycle complete' }}
+        </button>
+        <label>
+          <span>Cancellation reason</span>
+          <input [(ngModel)]="cancellationReason" [ngModelOptions]="{ standalone: true }" />
+        </label>
+        <button type="button" class="danger-button" (click)="cancelOrder()" [disabled]="!canCancel">Cancel Order</button>
+        <button type="button" class="secondary-button" (click)="printOrder()">Print Order</button>
+      </div>
+    </article>
+
+    <article class="order-panel">
+      <h2>Items</h2>
+      <ul class="item-list">
+        @for (item of order.items; track item.sku) {
+          <li>{{ item.quantity }} x {{ item.name }} ({{ item.sku }}) at {{ item.unitPrice }}</li>
+        }
+      </ul>
+      <h2>Shipping</h2>
+      <p>{{ order.shippingAddress.line1 }}, {{ order.shippingAddress.city }}, {{ order.shippingAddress.region }} {{ order.shippingAddress.postalCode }}</p>
+    </article>
+
+    <article class="order-panel order-panel--wide">
+      <div class="panel-header">
+        <h2>Timeline</h2>
+        <button type="button" class="secondary-button" (click)="load()">Refresh</button>
+      </div>
+      <tnl-order-timeline [events]="order.timeline" [currentStatus]="order.status"></tnl-order-timeline>
+    </article>
+
+    <tnl-order-proof
+      [proof]="proof"
+      [verification]="verification"
+      [loading]="proofLoading"
+      (generate)="generateProof()"
+      (verify)="verifyProof()"
+    ></tnl-order-proof>
+  </section>
+}

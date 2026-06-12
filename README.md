@@ -235,7 +235,7 @@ pnpm nx e2e ledger-web-e2e -- apps/ledger-web-e2e/src/devices.spec.ts
 
 ## Order Management Setup
 
-Sprint 3 order-management work starts with shared contracts. Backend and frontend order workflows are not active yet, but the order schemas are available through `@true-north-ledger/order-contracts` and `@true-north-ledger/shared-models`.
+Sprint 3 order management includes the tenant-scoped backend lifecycle, ledger events, search, proofs, and Angular list/create/detail workflows. Shared schemas are available through `@true-north-ledger/order-contracts` and `@true-north-ledger/shared-models`.
 
 Order contract validation commands:
 
@@ -243,6 +243,15 @@ Order contract validation commands:
 pnpm nx run order-contracts:lint
 pnpm nx run order-contracts:build
 pnpm nx run shared-models:test --coverage
+```
+
+Focused order workflow commands:
+
+```sh
+pnpm nx run ledger-api:test -- --runTestsByPath src/app/orders/orders.service.spec.ts
+pnpm nx run ledger-api:test -- --runTestsByPath src/app/orders/orders.integration.spec.ts
+pnpm nx run ledger-web:test -- --include apps/ledger-web/src/app/pages/orders
+pnpm nx run ledger-web-e2e:e2e-ci--src/orders.spec.ts
 ```
 
 Order lifecycle and proof contract details are documented in [Order Management](documentation/platform/order-management.md).

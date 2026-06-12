@@ -1,0 +1,112 @@
+<section class="orders-header">
+  <div>
+    <h1 class="page-heading">Orders</h1>
+    <p>Order lifecycle, ledger-backed milestones, and proof readiness.</p>
+    <p data-testid="order-realtime-state">
+      Real-time updates: {{ (orderRealtime.connected$ | async) ? 'connected' : 'disconnected' }}
+    </p>
+  </div>
+  <tnl-trust-seal
+    label="Order ledger"
+    [state]="orders.length > 0 ? 'verified' : 'pending'"
+  ></tnl-trust-seal>
+</section>
+
+<section class="order-summary" aria-label="Order status summary">
+  @for (status of statuses; track status) {
+    <div class="summary-tile">
+      <tnl-order-status-icon [status]="status"></tnl-order-status-icon>
+      <span class="summary-tile__count">{{ countByStatus(status) }}</span>
+      <span class="summary-tile__label">{{ status }}</span>
+    </div>
+  }
+</section>
+
+@if (error) {
+  <div class="order-state" data-testid="order-error-state">
+    <tnl-connection-status label="Orders" state="failed" [detail]="error"></tnl-connection-status>
+  </div>
+}
+
+<section class="order-layout">
+  <tnl-order-create></tnl-order-create>
+
+  <section class="order-panel order-board" aria-label="Orders board">
+    <form class="order-filters" [formGroup]="filtersForm" (ngSubmit)="applyFilters()">
+      <label>
+        <span>Status</span>
+        <select formControlName="status">
+          <option value="">All</option>
+          @for (status of statuses; track status) {
+            <option [value]="status">{{ status }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Search</span>
+        <input type="search" formControlName="query" />
+      </label>
+      <label>
+        <span>Customer ID</span>
+        <input formControlName="customerId" />
+      </label>
+      <label>
+        <span>Created from</span>
+        <input type="date" formControlName="createdFrom" />
+      </label>
+      <label>
+        <span>Created to</span>
+        <input type="date" formControlName="createdTo" />
+      </label>
+      <label>
+        <span>Sort by</span>
+        <select formControlName="sortBy">
+          <option value="createdAt">Created date</option>
+          <option value="totalAmount">Total amount</option>
+        </select>
+      </label>
+      <label>
+        <span>Direction</span>
+        <select formControlName="sortDirection">
+          <option value="desc">Descending</option>
+          <option value="asc">Ascending</option>
+        </select>
+      </label>
+      <button type="submit" [disabled]="loading">Refresh</button>
+      <button type="button" class="secondary-button" (click)="resetFilters()" [disabled]="loading">Reset filters</button>
+      <button type="button" class="secondary-button" (click)="exportCsv()" [disabled]="orders.length === 0">Export CSV</button>
+    </form>
+
+    @if (loading) {
+      <div class="order-state" data-testid="order-loading-state">
+        <tnl-connection-status label="Orders" state="connecting" detail="Loading orders"></tnl-connection-status>
+      </div>
+    } @else if (orders.length === 0) {
+      <tnl-empty-state title="No orders found" message="Create an order or adjust the filters." icon="info"></tnl-empty-state>
+    } @else {
+      <div class="order-list" data-testid="order-list">
+        @for (order of orders; track order.id) {
+          <article class="order-card" data-testid="order-card">
+            <div class="order-card__summary">
+              <tnl-order-status-icon [status]="order.status"></tnl-order-status-icon>
+              <div>
+              <h2><a [routerLink]="['/orders', order.id]">{{ order.orderNumber }}</a></h2>
+              <p>{{ order.customerName }} | {{ formatMoney(order) }} | {{ order.createdAt }}</p>
+              </div>
+            </div>
+            <tnl-status-chip [label]="order.status" stateText="Ledger tracked" [tone]="statusTone(order.status)"></tnl-status-chip>
+          </article>
+        }
+      </div>
+
+      <nav class="order-pagination" aria-label="Order pagination">
+        <p data-testid="order-pagination-summary">{{ paginationSummary }}</p>
+        <div>
+          <button type="button" (click)="previousPage()" [disabled]="page <= 1">Previous</button>
+          <span>Page {{ page }} of {{ totalPages }}</span>
+          <button type="button" (click)="nextPage()" [disabled]="page >= totalPages">Next</button>
+        </div>
+      </nav>
+    }
+  </section>
+</section>

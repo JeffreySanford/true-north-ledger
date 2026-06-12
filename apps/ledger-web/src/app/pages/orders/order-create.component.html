@@ -1,0 +1,75 @@
+<form class="order-panel order-create" [formGroup]="createForm" (ngSubmit)="submitCreate()" aria-label="Create order" data-testid="order-create">
+  <h2>Create Order</h2>
+  <tnl-progress-rail title="Order completeness" [steps]="createSteps"></tnl-progress-rail>
+
+  @if (error) {
+    <div class="order-state" data-testid="order-error-state">
+      <tnl-connection-status label="Order creation" state="failed" [detail]="error"></tnl-connection-status>
+    </div>
+  }
+
+  <p class="create-step-heading" data-testid="order-create-step">
+    Step {{ createStep + 1 }} of {{ createStepLabels.length }}: {{ createStepLabels[createStep] }}
+  </p>
+
+  @if (createStep === 0) {
+    <div class="form-grid" data-testid="order-create-customer-step">
+      <label><span>Customer ID</span><input formControlName="customerId" /></label>
+      <label><span>Customer name</span><input formControlName="customerName" /></label>
+      <label><span>Customer email</span><input formControlName="customerEmail" type="email" /></label>
+    </div>
+  } @else if (createStep === 1) {
+    <div formArrayName="items" class="order-items-editor" data-testid="order-create-items-step">
+      @for (item of items.controls; track item; let index = $index) {
+        <fieldset [formGroupName]="index" data-testid="order-create-item">
+          <legend>Item {{ index + 1 }}</legend>
+          <div class="form-grid">
+            <label>
+              <span>SKU</span>
+              <input formControlName="sku" [attr.list]="'order-item-catalog-' + index" (input)="applyCatalogItem(index)" autocomplete="off" />
+              <datalist [id]="'order-item-catalog-' + index" data-testid="order-item-catalog">
+                @for (catalogItem of itemCatalog; track catalogItem.sku) {
+                  <option [value]="catalogItem.sku">{{ catalogItem.name }} | {{ catalogItem.unitPrice }}</option>
+                }
+              </datalist>
+            </label>
+            <label><span>Item name</span><input formControlName="itemName" /></label>
+            <label><span>Quantity</span><input formControlName="quantity" type="number" min="1" /></label>
+            <label><span>Unit price</span><input formControlName="unitPrice" type="number" min="0" step="0.01" /></label>
+          </div>
+          <button type="button" class="secondary-button" (click)="removeItem(index)" [disabled]="items.length === 1">Remove item {{ index + 1 }}</button>
+        </fieldset>
+      }
+      <button type="button" class="secondary-button" (click)="addItem()">Add item</button>
+    </div>
+  } @else if (createStep === 2) {
+    <div class="form-grid" data-testid="order-create-shipping-step">
+      <label><span>Address</span><input formControlName="line1" /></label>
+      <label><span>City</span><input formControlName="city" /></label>
+      <label><span>Region</span><input formControlName="region" /></label>
+      <label><span>Postal code</span><input formControlName="postalCode" /></label>
+      <label><span>Country</span><input formControlName="country" maxlength="2" /></label>
+    </div>
+  } @else {
+    <div data-testid="order-create-review-step">
+      <label><span>Metadata JSON</span><textarea formControlName="metadata" rows="3"></textarea></label>
+      <p>{{ createForm.controls.customerName.value }} | {{ items.length }} item(s)</p>
+      <div class="review-strip" data-testid="order-create-review">
+        <span>Review total</span>
+        <strong>{{ estimatedTotal }}</strong>
+      </div>
+    </div>
+  }
+
+  <div class="create-step-actions">
+    <button type="button" class="secondary-button" (click)="previousCreateStep()" [disabled]="createStep === 0">Previous step</button>
+    @if (createStep < createStepLabels.length - 1) {
+      <button type="button" (click)="nextCreateStep()">Next step</button>
+    } @else {
+      <button type="submit" [disabled]="creating">{{ creating ? 'Creating order' : 'Create Order' }}</button>
+    }
+  </div>
+  @if (success) {
+    <p class="success-message">{{ success }}</p>
+  }
+</form>

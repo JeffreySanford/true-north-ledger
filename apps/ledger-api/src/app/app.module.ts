@@ -15,20 +15,27 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { RedisThrottlerStorage } from './auth/redis-throttler.storage';
 import { DevicesModule } from './devices/devices.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: process.env.NODE_ENV === 'production' 
-        ? '.env.production' 
-        : '.env.development',
+      envFilePath:
+        process.env.NODE_ENV === 'production'
+          ? '.env.production'
+          : '.env.development',
     }),
     ThrottlerModule.forRootAsync({
       useFactory: () => {
-        const defaultLimit = Number(process.env.LEDGER_GLOBAL_RATE_LIMIT_MAX ?? 100);
-        const defaultWindowMs = Number(process.env.LEDGER_GLOBAL_RATE_LIMIT_WINDOW_MS ?? 60_000);
-        const useRedisStorage = process.env.NODE_ENV !== 'test' && Boolean(process.env.REDIS_URL);
+        const defaultLimit = Number(
+          process.env.LEDGER_GLOBAL_RATE_LIMIT_MAX ?? 100,
+        );
+        const defaultWindowMs = Number(
+          process.env.LEDGER_GLOBAL_RATE_LIMIT_WINDOW_MS ?? 60_000,
+        );
+        const useRedisStorage =
+          process.env.NODE_ENV !== 'test' && Boolean(process.env.REDIS_URL);
 
         return {
           throttlers: [
@@ -38,7 +45,9 @@ import { DevicesModule } from './devices/devices.module';
               ttl: defaultWindowMs,
             },
           ],
-          ...(useRedisStorage ? { storage: new RedisThrottlerStorage(process.env.REDIS_URL) } : {}),
+          ...(useRedisStorage
+            ? { storage: new RedisThrottlerStorage(process.env.REDIS_URL) }
+            : {}),
         };
       },
     }),
@@ -48,6 +57,7 @@ import { DevicesModule } from './devices/devices.module';
     UsersModule,
     RolesModule,
     DevicesModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [

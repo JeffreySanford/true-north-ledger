@@ -6,17 +6,20 @@ import { HardenLedgerChain1717420000000 } from './migrations/1717420000000-harde
 import { AuthServiceTokenAndRoleMappings1717430000000 } from './migrations/1717430000000-auth-service-token-and-role-mappings';
 import { TenantUserRoles1717440000000 } from './migrations/1717440000000-tenant-user-roles';
 import { DeviceManagement1717450000000 } from './migrations/1717450000000-device-management';
+import { OrderManagement1717460000000 } from './migrations/1717460000000-order-management';
 import { ServiceTokenEntity } from './auth/service-token.entity';
 import { TenantRolePermissionEntity } from './auth/tenant-role-permission.entity';
 import { UserRoleRecordEntity } from './auth/user-role-record.entity';
 import { DeviceEntity } from './devices/device.entity';
 import { DeviceNonceEntity } from './devices/device-nonce.entity';
+import { OrderEntity } from './orders/order.entity';
 import { requiredEnv } from './config/required-env';
 
 // Load environment variables
-const envFile = process.env.NODE_ENV === 'production' 
-  ? '.env.production' 
-  : '.env.development';
+const envFile =
+  process.env.NODE_ENV === 'production'
+    ? '.env.production'
+    : '.env.development';
 
 config({ path: join(__dirname, '..', '..', '..', '..', envFile) });
 
@@ -34,16 +37,19 @@ export const typeOrmConfig: DataSourceOptions = {
     UserRoleRecordEntity,
     DeviceEntity,
     DeviceNonceEntity,
+    OrderEntity,
   ],
   migrations: [
     HardenLedgerChain1717420000000,
     AuthServiceTokenAndRoleMappings1717430000000,
     TenantUserRoles1717440000000,
     DeviceManagement1717450000000,
+    OrderManagement1717460000000,
   ],
   synchronize: process.env.NODE_ENV !== 'production', // Auto-create schema in dev
   logging: process.env.NODE_ENV === 'development',
-  ssl: process.env.ENABLE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  ssl:
+    process.env.ENABLE_SSL === 'true' ? { rejectUnauthorized: false } : false,
 };
 
 const dataSource = new DataSource(typeOrmConfig);

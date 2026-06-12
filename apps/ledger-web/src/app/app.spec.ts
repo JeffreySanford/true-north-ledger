@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { CommonModule } from '@angular/common';
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
@@ -20,11 +21,13 @@ describe('App', () => {
   let authUser$: BehaviorSubject<AuthUser | null>;
   let allowedPermissions: Set<string>;
   let logoutMock: ReturnType<typeof vi.fn>;
+  let httpGetMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     authUser$ = new BehaviorSubject<AuthUser | null>(null);
     allowedPermissions = new Set<string>();
     logoutMock = vi.fn(() => of(undefined));
+    httpGetMock = vi.fn(() => of({ orders: [], total: 7, page: 1, pageSize: 1 }));
 
     await TestBed.configureTestingModule({
       declarations: [App],
@@ -40,7 +43,14 @@ describe('App', () => {
               return authUser$.value !== null;
             },
             hasPermission: (permission: string) => allowedPermissions.has(permission),
+            authHeaders: () => ({ Authorization: 'Bearer test-token' }),
             logout: logoutMock,
+          },
+        },
+        {
+          provide: HttpClient,
+          useValue: {
+            get: httpGetMock,
           },
         },
       ],
@@ -107,6 +117,26 @@ describe('App', () => {
 
     expect(session.textContent).toContain('AU');
     expect(session.textContent).toContain('Welcome, Admin User');
+  });
+
+  it('renders the orders navigation count badge from the orders API', async () => {
+    authUser$.next({
+      ...user,
+      permissions: ['orders.read'],
+    });
+    allowedPermissions = new Set(['orders.read']);
+
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const badge = fixture.nativeElement.querySelector('[data-testid="orders-nav-badge"]') as HTMLElement;
+
+    expect(httpGetMock).toHaveBeenCalledWith(
+      '/api/v1/orders',
+      expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } }),
+    );
+    expect(badge.textContent?.trim()).toBe('7');
   });
 
   it('falls back to question-mark initials for blank usernames', () => {

@@ -151,6 +151,14 @@ test('disables the login button while authentication is pending', async ({ page 
 });
 
 test('defaults to sessionStorage when remember me is not selected', async ({ page }) => {
+  await page.route('**/api/v1/ledger/events**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
   await page.route('**/api/v1/auth/login**', async (route) => {
     if (route.request().method() !== 'POST') {
       await route.continue();
@@ -175,13 +183,11 @@ test('defaults to sessionStorage when remember me is not selected', async ({ pag
   });
 
   await page.goto('/login');
-  await page.locator('input[formcontrolname="username"]').fill('temp-user');
-  await page.locator('input[formcontrolname="password"]').fill('temp-user');
   await expect(page.locator('input[formcontrolname="rememberMe"]')).not.toBeChecked();
-  await page.locator('button[type="submit"]').click();
+  await submitLogin(page, 'temp-user', 'temp-user');
 
-  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('tnl.authToken'))).toBe('session-storage-access-token');
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
+  await expect(page.evaluate(() => sessionStorage.getItem('tnl.authToken'))).resolves.toBe('session-storage-access-token');
   await expect(page.evaluate(() => localStorage.getItem('tnl.authToken'))).resolves.toBeNull();
 });
 
@@ -226,17 +232,7 @@ test('fails login and remains on login page without storing a token', async ({ p
   });
 
   await page.goto('/login');
-  const usernameInput = page.locator('input[formcontrolname="username"]');
-  const passwordInput = page.locator('input[formcontrolname="password"]');
-  await expect(usernameInput).toBeVisible();
-  await expect(passwordInput).toBeVisible();
-
-  await usernameInput.fill('admin');
-  await passwordInput.fill('wrong');
-  await expect(usernameInput).toHaveValue('admin');
-  await expect(passwordInput).toHaveValue('wrong');
-
-  await page.click('button[type="submit"]');
+  await submitLogin(page, 'admin', 'wrong');
 
   await expect(page).toHaveURL(/\/login/);
   await expect(page.evaluate(() => localStorage.getItem('tnl.authToken'))).resolves.toBeNull();
@@ -532,7 +528,7 @@ test('redirects to unauthorized when backend returns tenant isolation violation'
 
   await page.goto('/ledger-events');
   await expect(page).toHaveURL(/\/unauthorized/);
-  await expect(page.locator('h1')).toHaveText('Access denied');
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
 });
 
 test('maintains unauthorized state after reload for a limited user', async ({ page }) => {
@@ -700,6 +696,14 @@ test('enforces planned route permission metadata matrix across web, tablet, and 
     { path: '/mobile/proofs', expectedHeading: 'Mobile Proof Verification' },
     { path: '/mobile/alerts', expectedHeading: 'Mobile Alerts' },
   ];
+
+  await page.route('**/api/v1/orders**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ orders: [], total: 0, page: 1, pageSize: 20 }),
+    });
+  });
 
   await page.addInitScript(() => {
     window.localStorage.setItem('tnl.authToken', 'matrix-admin-token');

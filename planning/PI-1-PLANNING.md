@@ -166,31 +166,31 @@ flowchart LR
 
 ### Sprint Acceptance Criteria
 
-- [ ] Orders can be created with proper validation
-- [ ] Order status changes create ledger events
-- [ ] Order history fully auditable via ledger
-- [ ] Order proofs generated for verification
-- [ ] Correlation IDs link related order events
-- [ ] Order list and detail views functional in UI
-- [ ] Integration tests validate order workflows
-- [ ] Order lifecycle rail, milestone badges, and proof indicators derive from order and ledger state
+- [x] Orders can be created with proper validation
+- [x] Order status changes create ledger events
+- [x] Order history fully auditable via ledger
+- [x] Order proofs generated for verification
+- [x] Correlation IDs link related order events
+- [x] Order list and detail views functional in UI
+- [x] Integration tests validate order workflows
+- [x] Order lifecycle rail, milestone badges, and proof indicators derive from order and ledger state
 
 ### Tasks
 
 #### Backend Orders System
-- [ ] Create `orders` module in ledger-api
-- [ ] Create `Order` entity with TypeORM (id, tenant_id, status, customer_id, items, created_at, updated_at)
-- [ ] Implement create order endpoint (`POST /api/v1/orders`)
-- [ ] Add update order status endpoint (`PATCH /api/v1/orders/:id/status`)
-- [ ] Build order retrieval endpoints (`GET /api/v1/orders`, `GET /api/v1/orders/:id`)
-- [ ] Create order cancellation endpoint (`POST /api/v1/orders/:id/cancel`)
-- [ ] Implement order ledger event types (ORDER_CREATED, ORDER_STATUS_CHANGED, ORDER_CANCELLED)
-- [ ] Add correlation ID tracking for related order events
-- [ ] Build order proof generation logic
-- [ ] Create order search with filtering (status, date range, customer)
-- [ ] Write behavior-focused unit tests for order service
-- [ ] Write integration tests for order lifecycle
-- [ ] Add OpenAPI documentation for order endpoints
+- [x] Create `orders` module in ledger-api
+- [x] Create `Order` entity with TypeORM (id, tenant_id, status, customer_id, items, created_at, updated_at)
+- [x] Implement create order endpoint (`POST /api/v1/orders`)
+- [x] Add update order status endpoint (`PATCH /api/v1/orders/:id/status`)
+- [x] Build order retrieval endpoints (`GET /api/v1/orders`, `GET /api/v1/orders/:id`)
+- [x] Create order cancellation endpoint (`POST /api/v1/orders/:id/cancel`)
+- [x] Implement order ledger event types (ORDER_CREATED, ORDER_STATUS_CHANGED, ORDER_CANCELLED)
+- [x] Add correlation ID tracking for related order events
+- [x] Build order proof generation logic
+- [x] Create order search with filtering (status, date range, customer)
+- [x] Write behavior-focused unit tests for order service
+- [x] Write integration tests for order lifecycle
+- [x] Add OpenAPI documentation for order endpoints
 
 #### Contract Updates
 - [x] Create order schemas in shared-models/order-contracts (CreateOrderRequest, OrderStatusUpdateRequest, OrderResponse)
@@ -199,33 +199,46 @@ flowchart LR
 - [x] Add order proof schema
 
 #### Frontend Orders Management
-- [ ] Create `OrderService` in ledger-web
-- [ ] Build orders list page (`/orders`)
-- [ ] Create order detail page (`/orders/:id`)
-- [ ] Add order creation form
-- [ ] Display order status timeline
-- [ ] Show related ledger events for each order
-- [ ] Implement order search and filters
-- [ ] Add order proof view/download
-- [ ] Write unit tests for order service
+- [x] Create `OrderService` in ledger-web
+- [x] Build orders list page (`/orders`)
+- [x] Create order detail page (`/orders/:id`)
+- [x] Add order creation form
+- [x] Display order status timeline
+- [x] Show related ledger events for each order
+- [x] Implement order search and filters
+- [x] Add order proof view/download
+- [x] Write unit tests for order service
 
 #### Visual & Experience Work
-- [ ] Add order lifecycle rail and milestone badges
-- [ ] Add order completeness rail for customer, items, address, review, and proof readiness
-- [ ] Reuse shared timeline rail, status chip, trust seal, event card, and proof hash card components
-- [ ] Add proof verified, failed, and pending visual states with non-color labels
-- [ ] Add reduced-motion fallback for order timeline and proof confirmation animations
-- [ ] Add unit tests for lifecycle, proof, empty, loading, and error visual states
+- [x] Add order lifecycle rail and milestone badges
+- [x] Add order completeness rail for customer, items, address, review, and proof readiness
+- [x] Reuse shared timeline rail, status chip, trust seal, event card, and proof hash card components
+- [x] Add proof verified, failed, and pending visual states with non-color labels
+- [x] Add reduced-motion fallback for order timeline and proof confirmation animations
+- [x] Add unit tests for lifecycle, proof, empty, loading, and error visual states
 
 #### Testing & Documentation
-- [ ] E2E tests: create order workflow
-- [ ] E2E tests: order status updates create ledger events
-- [ ] E2E tests: order cancellation workflow
-- [ ] E2E tests: order proof generation and verification
-- [ ] E2E tests: order search and filtering
-- [ ] E2E tests: order lifecycle rail, milestone badges, and proof indicators are accessible and responsive
-- [ ] Document order API workflows
-- [ ] Create order integration guide for partners
+- [x] E2E tests: create order workflow
+- [x] E2E tests: order status updates create ledger events
+- [x] E2E tests: order cancellation workflow
+- [x] E2E tests: order proof generation and verification
+- [x] E2E tests: order search and filtering
+- [x] E2E tests: order lifecycle rail, milestone badges, and proof indicators are accessible and responsive
+- [x] Document order API workflows
+- [x] Create order integration guide for partners
+
+### Current Sprint 3 Delivery Update (2026-06-12)
+
+- Completed the backend orders lifecycle, contracts, Angular list/create/detail/proof experience, shared visual primitives, and order workflow test coverage.
+- Added catalog-backed SKU autocomplete to the multi-step order form with custom SKU support.
+- Extracted the four-step creation workflow into a dedicated `OrderCreateComponent` with focused unit coverage and updated Playwright metadata-error recovery coverage.
+- Added resettable order search filters with Angular unit and cross-browser Playwright coverage.
+- Completed the order API workflow, quick-start, partner integration, payload, proof verification, search, UI state, testing, environment, and troubleshooting documentation.
+- Resolved a local full-stack port conflict by moving the external `phase-2-cosmic` Grafana host mapping from `3000` to `3005`, preserving `3000` for the ledger API.
+- Stabilized full-suite Playwright execution by using the public API readiness endpoint, isolating route-permission coverage from live order authentication, and tightening the unauthorized-page assertion.
+- Completed authenticated tenant-scoped real-time order updates and shared Angular order state propagation, including live full-stack Playwright coverage.
+- Current full gates: all unit targets passed (`shared-models` 14 tests, `ledger-web` 153 tests, `ledger-api` 189 tests), `ledger-web-e2e` lint passed, and the full development-stack Playwright target passed 484 tests with 16 intentionally skipped across 500 discovered tests.
+- Sprint 3 code review, critical/high bug review, development-environment testing, demo-readiness, order state management, and real-time update gates are complete.
 
 ---
 

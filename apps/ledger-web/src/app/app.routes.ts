@@ -30,10 +30,9 @@ export const appRoutes: Route[] = [
   },
   {
     path: 'orders',
-    loadChildren: () =>
-      import('./pages/feature-placeholder/feature-placeholder.module').then((m) => m.FeaturePlaceholderModule),
+    loadChildren: () => import('./pages/orders/orders.module').then((m) => m.OrdersModule),
     canActivate: [authGuard],
-    data: { requiredPermissions: ['orders.read'], surface: 'web', featureTitle: 'Orders' },
+    data: { requiredPermissions: ['orders.read'], surface: 'web' },
   },
   {
     path: 'inventory',
