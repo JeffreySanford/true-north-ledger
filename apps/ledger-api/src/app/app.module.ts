@@ -16,6 +16,7 @@ import { RolesModule } from './roles/roles.module';
 import { RedisThrottlerStorage } from './auth/redis-throttler.storage';
 import { DevicesModule } from './devices/devices.module';
 import { OrdersModule } from './orders/orders.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { OrdersModule } from './orders/orders.module';
     RolesModule,
     DevicesModule,
     OrdersModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [

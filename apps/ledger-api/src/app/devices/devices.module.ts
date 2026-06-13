@@ -14,6 +14,6 @@ import { DevicesService } from './devices.service';
   imports: [TypeOrmModule.forFeature([DeviceEntity, DeviceNonceEntity]), AuthModule, LedgerEventsModule],
   controllers: [DevicesController, DeviceEventsController],
   providers: [DevicesService, DeviceAuthGuard, DeviceAuthStrategy],
-  exports: [DevicesService],
+  exports: [DevicesService, DeviceAuthStrategy],
 })
 export class DevicesModule {}

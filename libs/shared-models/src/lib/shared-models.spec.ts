@@ -6,6 +6,20 @@ import {
   DeviceHardwareExamples,
   DeviceRegistrationRequestSchema,
   DeviceTypeSchema,
+  CreateInventoryItemRequestExample,
+  CreateInventoryItemRequestSchema,
+  InventoryItemExample,
+  InventoryItemSchema,
+  InventoryAlertListResponseSchema,
+  InventoryAnomalyListResponseSchema,
+  InventoryLedgerEventActionSchema,
+  InventoryMoveRequestSchema,
+  InventoryProvenanceResponseSchema,
+  InventoryRemovalRequestSchema,
+  InventoryScanRequestSchema,
+  InventoryReservationReleaseRequestSchema,
+  InventoryReservationRequestSchema,
+  InventoryStatusSchema,
   OrderExample,
   OrderLedgerEventActionSchema,
   OrderSchema,
@@ -200,5 +214,149 @@ describe('shared-models', () => {
     expect(() =>
       OrderTimelineEventSchema.parse({ ...event, actorMetadata: {} }),
     ).toThrow();
+  });
+
+  it('exports schema-valid Sprint 4 inventory examples and lifecycle values', () => {
+    const request = CreateInventoryItemRequestSchema.parse(CreateInventoryItemRequestExample);
+    const item = InventoryItemSchema.parse(InventoryItemExample);
+
+    expect(request.sku).toBe('SKU-100');
+    expect(item.status).toBe('available');
+    expect(item.locationId).toBe(request.locationId);
+    expect(InventoryStatusSchema.options).toEqual([
+      'available',
+      'reserved',
+      'in_transit',
+      'damaged',
+      'expired',
+      'removed',
+    ]);
+    expect(InventoryLedgerEventActionSchema.options).toContain('INVENTORY_ADDED');
+  });
+
+  it('normalizes inventory SKUs and rejects negative quantities', () => {
+    expect(CreateInventoryItemRequestSchema.parse({
+      ...CreateInventoryItemRequestExample,
+      sku: ' sku-lower ',
+    }).sku).toBe('SKU-LOWER');
+    expect(() => CreateInventoryItemRequestSchema.parse({
+      ...CreateInventoryItemRequestExample,
+      quantity: -1,
+    })).toThrow();
+  });
+
+  it('validates inventory reservation and release contracts', () => {
+    expect(InventoryReservationRequestSchema.parse({
+      quantity: 5,
+      orderId: '77777777-7777-4777-8777-777777777777',
+    })).toEqual({
+      quantity: 5,
+      orderId: '77777777-7777-4777-8777-777777777777',
+    });
+    expect(InventoryReservationReleaseRequestSchema.parse({ reason: 'Order cancelled' })).toEqual({
+      reason: 'Order cancelled',
+    });
+    expect(() => InventoryReservationRequestSchema.parse({ quantity: 0 })).toThrow();
+  });
+
+  it('validates inventory movement destinations', () => {
+    expect(InventoryMoveRequestSchema.parse({
+      locationId: 'AUSTIN-B2',
+      locationName: 'Austin Warehouse - Aisle B2',
+      reason: 'Cycle count',
+    })).toEqual({
+      locationId: 'AUSTIN-B2',
+      locationName: 'Austin Warehouse - Aisle B2',
+      reason: 'Cycle count',
+    });
+    expect(() => InventoryMoveRequestSchema.parse({ locationId: '', locationName: '' })).toThrow();
+  });
+
+  it('requires a reason for inventory removal', () => {
+    expect(InventoryRemovalRequestSchema.parse({
+      reason: 'Damaged beyond repair',
+    })).toEqual({
+      reason: 'Damaged beyond repair',
+    });
+    expect(() => InventoryRemovalRequestSchema.parse({ reason: '' })).toThrow();
+  });
+
+  it('validates inventory scans by SKU or serial value', () => {
+    expect(InventoryScanRequestSchema.parse({
+      value: ' SKU-100 ',
+      scanType: 'barcode',
+      locationId: 'AUSTIN-A1',
+    })).toEqual({
+      value: 'SKU-100',
+      scanType: 'barcode',
+      locationId: 'AUSTIN-A1',
+    });
+    expect(() => InventoryScanRequestSchema.parse({ value: '', scanType: 'camera' })).toThrow();
+  });
+
+  it('validates chronological inventory provenance responses', () => {
+    const response = InventoryProvenanceResponseSchema.parse({
+      item: InventoryItemExample,
+      events: [{
+        eventId: '66666666-6666-4666-8666-666666666666',
+        action: 'INVENTORY_ADDED',
+        actorType: 'user',
+        actorId: 'inventory-admin',
+        deviceId: null,
+        deviceType: null,
+        locationId: 'AUSTIN-A1',
+        locationName: 'Austin Warehouse - Aisle A1',
+        quantity: 25,
+        reservedQuantity: 0,
+        details: { action: 'INVENTORY_ADDED' },
+        timestamp: '2026-06-11T12:00:00.000Z',
+        chainSequence: 1,
+        eventHash: 'hash-1',
+      }],
+    });
+    expect(response.events[0].action).toBe('INVENTORY_ADDED');
+  });
+
+  it('validates inventory anomaly severity, status, and remediation', () => {
+    const response = InventoryAnomalyListResponseSchema.parse({
+      anomalies: [{
+        id: `${InventoryItemExample.id}:low_stock`,
+        itemId: InventoryItemExample.id,
+        sku: InventoryItemExample.sku,
+        name: InventoryItemExample.name,
+        type: 'low_stock',
+        severity: 'warning',
+        status: 'open',
+        message: 'Stock is below threshold.',
+        locationId: InventoryItemExample.locationId,
+        locationName: InventoryItemExample.locationName,
+        detectedAt: InventoryItemExample.updatedAt,
+        remediation: 'Replenish inventory.',
+        details: { quantity: 2, minimumQuantity: 5 },
+      }],
+      total: 1,
+    });
+    expect(response.anomalies[0]).toMatchObject({ severity: 'warning', status: 'open' });
+  });
+
+  it('validates inventory alert type, severity, and action', () => {
+    const response = InventoryAlertListResponseSchema.parse({
+      alerts: [{
+        id: `${InventoryItemExample.id}:low_stock:low_stock`,
+        itemId: InventoryItemExample.id,
+        sku: InventoryItemExample.sku,
+        name: InventoryItemExample.name,
+        type: 'low_stock',
+        severity: 'warning',
+        message: 'Stock is below threshold.',
+        locationId: InventoryItemExample.locationId,
+        locationName: InventoryItemExample.locationName,
+        createdAt: InventoryItemExample.updatedAt,
+        action: 'Replenish inventory.',
+        details: { quantity: 2, minimumQuantity: 5 },
+      }],
+      total: 1,
+    });
+    expect(response.alerts[0]).toMatchObject({ type: 'low_stock', action: 'Replenish inventory.' });
   });
 });

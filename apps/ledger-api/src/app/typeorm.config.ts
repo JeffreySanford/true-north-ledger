@@ -13,6 +13,8 @@ import { UserRoleRecordEntity } from './auth/user-role-record.entity';
 import { DeviceEntity } from './devices/device.entity';
 import { DeviceNonceEntity } from './devices/device-nonce.entity';
 import { OrderEntity } from './orders/order.entity';
+import { InventoryItemEntity } from './inventory/inventory-item.entity';
+import { InventoryManagement1717470000000 } from './migrations/1717470000000-inventory-management';
 import { requiredEnv } from './config/required-env';
 
 // Load environment variables
@@ -38,6 +40,7 @@ export const typeOrmConfig: DataSourceOptions = {
     DeviceEntity,
     DeviceNonceEntity,
     OrderEntity,
+    InventoryItemEntity,
   ],
   migrations: [
     HardenLedgerChain1717420000000,
@@ -45,6 +48,7 @@ export const typeOrmConfig: DataSourceOptions = {
     TenantUserRoles1717440000000,
     DeviceManagement1717450000000,
     OrderManagement1717460000000,
+    InventoryManagement1717470000000,
   ],
   synchronize: process.env.NODE_ENV !== 'production', // Auto-create schema in dev
   logging: process.env.NODE_ENV === 'development',

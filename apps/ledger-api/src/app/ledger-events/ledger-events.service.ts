@@ -73,6 +73,19 @@ export class LedgerEventsService {
     );
   }
 
+  findSubjectEvents(
+    tenantId: string,
+    subjectType: string,
+    subjectId: string,
+  ): Observable<LedgerEventResponse[]> {
+    return from(
+      this.ledgerEventRepository.find({
+        where: { tenantId, subjectType, subjectId },
+        order: { chainSequence: 'ASC' },
+      }),
+    ).pipe(map((entities) => entities.map((entity) => this.entityToResponse(entity))));
+  }
+
   verifyChain(tenantId: string): Observable<LedgerChainVerificationResponse> {
     return from(
       this.ledgerEventRepository.find({

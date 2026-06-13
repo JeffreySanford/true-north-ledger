@@ -1,0 +1,20 @@
+{
+  "name": "inventory-contracts",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/inventory-contracts/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:inventory"],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/inventory-contracts",
+        "main": "libs/inventory-contracts/src/index.ts",
+        "tsConfig": "libs/inventory-contracts/tsconfig.lib.json",
+        "assets": ["libs/inventory-contracts/*.md"],
+        "format": ["cjs"]
+      }
+    }
+  }
+}

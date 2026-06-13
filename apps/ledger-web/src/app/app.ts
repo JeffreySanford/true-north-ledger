@@ -29,6 +29,7 @@ export class App implements OnInit, OnDestroy {
     { label: 'Ledger Events', route: '/ledger-events', permission: 'ledger.read' },
     { label: 'Devices', route: '/devices', permission: 'devices.read' },
     { label: 'Orders', route: '/orders', permission: 'orders.read' },
+    { label: 'Inventory', route: '/inventory', permission: 'inventory.read' },
     { label: 'Tablet Receiving', route: '/tablet/receiving', permission: 'devices.read' },
     { label: 'Mobile Scan', route: '/mobile/scan', permission: 'proof.read' },
     { label: 'Proofs', route: '/proofs', permission: 'proof.read' },

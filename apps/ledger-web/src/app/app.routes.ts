@@ -36,10 +36,9 @@ export const appRoutes: Route[] = [
   },
   {
     path: 'inventory',
-    loadChildren: () =>
-      import('./pages/feature-placeholder/feature-placeholder.module').then((m) => m.FeaturePlaceholderModule),
+    loadChildren: () => import('./pages/inventory/inventory.module').then((m) => m.InventoryModule),
     canActivate: [authGuard],
-    data: { requiredPermissions: ['inventory.read'], surface: 'web', featureTitle: 'Inventory' },
+    data: { requiredPermissions: ['inventory.read'], surface: 'web' },
   },
   {
     path: 'shipping',
