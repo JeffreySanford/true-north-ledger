@@ -4,22 +4,67 @@ True North Ledger is an API-first audit and provenance platform for human workfl
 
 The product goal is simple: every actor has an identity, and every meaningful action becomes an auditable ledger event.
 
+## Product Narrative
+
+True North Ledger is built for organizations that need operational work to be traceable after the fact and trustworthy while it is happening. Warehouse operators, supervisors, service integrators, scanners, tablets, and backend jobs all act through the same platform rule: identify the actor, validate the permission, execute the workflow, and write the result to the ledger.
+
+The software currently focuses on four connected operating areas:
+
+- Authentication and authorization establish who is acting, which tenant they belong to, and which workflows they may use.
+- Device management registers scanners, tablets, gateways, printers, sensors, and kiosks so hardware can submit authenticated heartbeats and events.
+- Order management records customer orders, lifecycle transitions, proof generation, and audit history.
+- Inventory management tracks stock, reservations, moves, scans, anomalies, alerts, and item provenance.
+
+Who uses it:
+
+- Operators use the Angular web app to add inventory, reserve stock, move items, scan SKUs or serials, inspect orders, and review ledger-backed provenance.
+- Supervisors use dashboards, alerts, anomalies, proofs, and audit trails to understand what happened and where attention is needed.
+- Devices use `X-Device-Key` authentication to send heartbeats, domain events, and inventory scans without sharing human credentials.
+- Partner systems and service clients use bearer tokens or service tokens to integrate order and inventory workflows through REST APIs.
+- Auditors and support engineers use ledger events, provenance views, and troubleshooting docs to reconstruct actions by actor, tenant, time, item, order, or device.
+
+What happens in a normal workflow:
+
+1. A user signs in or a device authenticates with its registered key.
+2. The API checks tenant and permission boundaries before any protected action runs.
+3. The workflow service updates PostgreSQL state for orders, inventory, devices, or auth sessions.
+4. A ledger event is appended with actor, tenant, metadata, payload hash, previous hash, and chain sequence.
+5. The Angular app reloads the authoritative state and shows status, provenance, alerts, or error feedback.
+
+When to use it:
+
+- During receiving, cycle counts, fulfillment, returns, device provisioning, and operational audits.
+- When orders or inventory cross a trust boundary and the business needs proof of status or chain of custody.
+- When scanner and gateway events need to become first-class business events instead of disposable logs.
+
+Where it runs:
+
+- Locally as an Nx monorepo with Angular, NestJS, PostgreSQL, Redis, and Playwright.
+- In development through `pnpm start:all` and Docker Compose infrastructure.
+- In future production deployments behind managed infrastructure, observability, and real-time notification channels.
+
+Why it exists:
+
+- Operational systems often know the latest state but cannot explain the path that produced it.
+- True North Ledger keeps the current state useful for daily work while preserving immutable evidence for review, support, compliance, and partner trust.
+
 ## Current Workspace
 
 This repository is an Nx workspace using pnpm.
 
-**Current Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, and Sprint 2 device management are complete and pushed. Sprint 3 order-management work has started with shared order contracts and schema tests.
+**Current Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, Sprint 2 device management, Sprint 3 order management, and Sprint 4 inventory management are implemented and pushed. Sprint 5 real-time notifications and production hardening remain planned PI-1 work.
 
 Implemented now:
 
 - `apps/ledger-web` - Angular web application with routing, SCSS, Vitest, and Playwright
 - `apps/ledger-web-e2e` - Playwright e2e project with browser quality, login, permission, and full-stack JWT checks
-- `apps/ledger-api` - NestJS REST API with PostgreSQL persistence, authenticated ledger events, auth endpoints, and Swagger/OpenAPI docs
+- `apps/ledger-api` - NestJS REST API with PostgreSQL persistence, authenticated ledger events, auth, devices, orders, inventory, and Swagger/OpenAPI docs
 - `libs/shared-models` - Unified contract library exports
 - `libs/ledger-contracts` - Core Zod schemas for ledger events and metadata
 - `libs/auth-contracts` - Actor type and permission schemas  
 - `libs/device-contracts` - Device ledger event schemas
 - `libs/order-contracts` - Order lifecycle, timeline, and proof schemas
+- `libs/inventory-contracts` - Inventory item, operation, scan, provenance, anomaly, and alert schemas
 - `libs/audit-contracts` - Audit metadata schemas
 - Docker Compose infrastructure (PostgreSQL, Redis, PgAdmin)
 
@@ -30,9 +75,10 @@ Implemented now:
 - Lint/build/audit: passing cleanly
 
 **Remaining Product Gaps:**
-1. Sprint 3 orders backend, frontend, proof, and E2E workflows remain in active development.
-2. Inventory, public proof pages, WebSockets, and production monitoring remain PI-1 roadmap work.
+1. Real-time WebSocket notifications and external push/email notification transports remain Sprint 5 work.
+2. Public proof pages, production monitoring, and production deployment hardening remain PI-1 roadmap work.
 3. Browser auth can move from storage-backed bearer tokens toward secure cookie sessions when API/client constraints allow.
+4. Inventory location registry validation and reservation timeout background scheduling remain future workflow infrastructure work.
 
 **Architecture:**
 - Schema-driven contracts with Zod validation across frontend and API
@@ -62,27 +108,30 @@ flowchart LR
   partner[Partner API Clients]
   device[Devices and Gateways]
 
-  api[Ledger API]
-  register[Device Registration and QR Provisioning]
-  heartbeat[Device Heartbeats]
-  events[Device Event Ingestion]
-  ledger[Audit and Provenance Engine]
-  db[(Postgres)]
+  api         [Ledger API]
+  register    [Device Registration and QR Provisioning]
+  heartbeat   [Device Heartbeats]
+  events      [Device Event Ingestion]
+  inventory   [Inventory Management and Scan Tracking]
+  ledger      [Audit and Provenance Engine]
+  db          [(Postgres)]
 
-  web --> api
-  tablet --> api
-  mobile --> api
-  proof --> api
-  partner --> api
-  device --> api
-  api --> register
-  device --> heartbeat
-  device --> events
-  register --> ledger
-  heartbeat --> ledger
-  events --> ledger
-  api --> ledger
-  ledger --> db
+  web         --> api
+  tablet      --> api
+  mobile      --> api
+  proof       --> api
+  partner     --> api
+  device      --> api
+  api         --> register
+  device      --> heartbeat
+  device      --> events
+  register    --> ledger
+  heartbeat   --> ledger
+  events      --> ledger
+  events      --> inventory
+  inventory   --> ledger
+  api         --> ledger
+  ledger      --> db
 ```
 
 ## Core Principles
@@ -256,6 +305,57 @@ pnpm nx run ledger-web-e2e:e2e-ci--src/orders.spec.ts
 
 Order lifecycle and proof contract details are documented in [Order Management](documentation/platform/order-management.md).
 
+## Inventory Management Setup
+
+Sprint 4 inventory management includes tenant-scoped inventory creation, JSON/CSV import, list/detail retrieval, reservations with optional timeout metadata, manual release of expired reservations, movement and bulk movement, quantity/status changes, soft removal, operator scans, device scans, provenance, anomaly detection, alerts, and an Angular inventory dashboard.
+
+Start the stack:
+
+```sh
+pnpm start:all
+```
+
+Sign in to `http://localhost:4200/login` with a user that has `inventory.read` and `inventory.write`, then open `http://localhost:4200/inventory`.
+
+Inventory APIs use bearer authentication:
+
+```http
+Authorization: Bearer <access-token>
+```
+
+Device-originated inventory scans may also use:
+
+```http
+X-Device-Key: tnl_dev_example
+```
+
+Minimal inventory creation request:
+
+```sh
+curl -X POST http://localhost:3000/api/v1/inventory \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sku": "SKU-100",
+    "name": "Serialized sensor kit",
+    "locationId": "AUSTIN-A1",
+    "locationName": "Austin Warehouse - Aisle A1",
+    "quantity": 25,
+    "unitOfMeasure": "each"
+  }'
+```
+
+Focused inventory workflow commands:
+
+```sh
+pnpm nx test ledger-api -- --runTestsByPath src/app/inventory/inventory.service.spec.ts
+pnpm nx test ledger-api -- --runTestsByPath src/app/inventory/inventory.integration.spec.ts
+pnpm nx test ledger-web -- --include apps/ledger-web/src/app/pages/inventory
+pnpm nx e2e ledger-web-e2e -- apps/ledger-web-e2e/src/inventory.spec.ts
+```
+
+Inventory integration examples are documented in [Inventory Integration Guide](documentation/platform/inventory-integration-guide.md). Device scan protocol details are documented in [Device Event Ingestion Guide](documentation/platform/device-event-ingestion-guide.md). Operational failure handling is documented in [Inventory Troubleshooting](documentation/platform/inventory-troubleshooting.md).
+
 ## Auth Testing Instructions
 
 Run auth-related backend tests:
@@ -279,7 +379,7 @@ pnpm nx e2e ledger-web-e2e -- --grep "login|refresh|unauthorized|permission"
 
 ## Project Planning & Roadmap
 
-**Current Phase:** PI-1 / Sprint 3 started
+**Current Phase:** PI-1 / Sprint 5 next
 
 ### Planning Documents
 
@@ -307,11 +407,11 @@ All planning documents are located in the [`planning/`](planning/) folder:
 
 By end of PI-1 (10 weeks), the platform is planned to have:
 
-- Secure authentication for all actor types (`user`, `service`, `device`, `system`)
-- Device registration, authentication, and event ingestion
-- Orders module with full audit trail
-- Inventory tracking with device scan integration
-- Real-time WebSocket notifications
+- Secure authentication for all actor types (`user`, `service`, `device`, `system`) - implemented for current API/UI workflows
+- Device registration, authentication, and event ingestion - implemented
+- Orders module with full audit trail - implemented
+- Inventory tracking with device scan integration - implemented
+- Real-time WebSocket notifications - planned Sprint 5 work
 - Production infrastructure with monitoring
 - Public proof verification system
 - Shared visual system with reusable MD3 components, accessible animations, and E2E coverage for visual states
@@ -332,6 +432,9 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 - [Device Ingestion](documentation/platform/device-ingestion.md)
 - [Device Management](documentation/platform/device-management.md)
 - [Device Event Ingestion Guide](documentation/platform/device-event-ingestion-guide.md)
+- [Inventory Management](documentation/platform/inventory-management.md)
+- [Inventory Integration Guide](documentation/platform/inventory-integration-guide.md)
+- [Inventory Troubleshooting](documentation/platform/inventory-troubleshooting.md)
 - [Order Management](documentation/platform/order-management.md)
 - [Security Model](documentation/platform/security-model.md)
 - [RBAC and Role-Specific Views](documentation/platform/rbac-and-views.md)
@@ -355,6 +458,7 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 
 - [Service Token Integration Guide for Partners](documentation/platform/service-token-integration-guide.md)
 - [Device Event Ingestion Guide](documentation/platform/device-event-ingestion-guide.md)
+- [Inventory Integration Guide](documentation/platform/inventory-integration-guide.md)
 
 ### Planning & Roadmap
 

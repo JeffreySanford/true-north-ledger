@@ -39,6 +39,14 @@
 }
 .inventory-layout { align-items: flex-start; flex-wrap: wrap; }
 .inventory-add, .inventory-scan { display: grid; gap: .75rem; flex: 0 1 20rem; }
+.camera-scan-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.camera-scan-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
 .inventory-board { flex: 1 1 100%; min-width: 0; }
 label { display: grid; gap: .25rem; }
 input, select, button, textarea { box-sizing: border-box; max-width: 100%; min-height: 2.5rem; }

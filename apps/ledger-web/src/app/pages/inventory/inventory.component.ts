@@ -43,6 +43,20 @@ interface ProvenanceLocationEntry {
 
 type ScanFeedbackState = 'accepted' | 'rejected';
 
+interface BarcodeDetectionResult {
+  rawValue?: string;
+}
+
+interface BarcodeDetectorConstructor {
+  new(options?: { formats?: string[] }): {
+    detect(source: ImageBitmapSource): Promise<BarcodeDetectionResult[]>;
+  };
+}
+
+type CameraScanWindow = Window & typeof globalThis & {
+  BarcodeDetector?: BarcodeDetectorConstructor;
+};
+
 @Component({
   standalone: false,
   selector: 'tnl-inventory',
@@ -71,6 +85,8 @@ export class InventoryComponent implements OnInit, OnDestroy {
   bulkMoveResults: InventoryBulkMoveResult[] = [];
   importResults: InventoryImportResult[] = [];
   scanFeedbackState: ScanFeedbackState | null = null;
+  cameraScanAvailable = false;
+  cameraScanning = false;
   toastMessage: string | null = null;
   toastTone: 'success' | 'error' = 'success';
 
@@ -152,6 +168,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.refreshCameraScanAvailability();
     this.load(1);
   }
 
@@ -438,6 +455,57 @@ export class InventoryComponent implements OnInit, OnDestroy {
         this.changeDetectorRef.detectChanges();
       },
     });
+  }
+
+  refreshCameraScanAvailability(): void {
+    this.cameraScanAvailable = typeof window !== 'undefined' &&
+      'BarcodeDetector' in window &&
+      typeof window.createImageBitmap === 'function';
+  }
+
+  startCameraScan(input: HTMLInputElement): void {
+    if (!this.cameraScanAvailable) {
+      this.error = 'Camera barcode scanning is not available in this browser.';
+      return;
+    }
+    input.click();
+  }
+
+  async handleCameraScanFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const cameraWindow = window as CameraScanWindow;
+    if (!cameraWindow.BarcodeDetector || typeof cameraWindow.createImageBitmap !== 'function') {
+      this.error = 'Camera barcode scanning is not available in this browser.';
+      input.value = '';
+      return;
+    }
+
+    this.cameraScanning = true;
+    this.error = null;
+    this.success = null;
+    try {
+      const bitmap = await cameraWindow.createImageBitmap(file);
+      const detector = new cameraWindow.BarcodeDetector({
+        formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e'],
+      });
+      const [result] = await detector.detect(bitmap);
+      const rawValue = result?.rawValue?.trim();
+      if (!rawValue) {
+        this.error = 'No barcode or QR code was detected in the selected image.';
+        return;
+      }
+      this.scanForm.patchValue({ value: rawValue, scanType: 'barcode' });
+      this.success = `Camera scan detected ${rawValue}. Review location and submit scan.`;
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : 'Camera scan failed.';
+    } finally {
+      this.cameraScanning = false;
+      input.value = '';
+      this.changeDetectorRef.detectChanges();
+    }
   }
 
   scanInventoryBatch(): void {

@@ -22,6 +22,15 @@ Revoked and suspended devices are rejected before event ingestion.
 
 ## Single Event
 
+Inventory scanner events should use `eventType: "inventory.scan"` when the device event should also drive inventory scan tracking. The payload must include one inventory identity field:
+
+- `value`
+- `sku`
+- `serialNumber`
+- `barcode`
+
+The inventory scan type is read from `payload.scanType` when present. If omitted, the server defaults to `barcode` when `barcode` is present and `manual` otherwise. Supported scan types are `barcode`, `qr`, `rfid`, and `manual`.
+
 ```sh
 curl -X POST http://localhost:3000/api/v1/device-events \
   -H "Content-Type: application/json" \
@@ -33,11 +42,15 @@ curl -X POST http://localhost:3000/api/v1/device-events \
       "sku": "SKU-001",
       "quantity": 4,
       "barcode": "012345678905",
+      "scanType": "barcode",
+      "locationId": "dock-a",
       "station": "dock-a"
     },
     "nonce": "scanner-01-000001"
   }'
 ```
+
+Accepted inventory scan events create both `DEVICE_EVENT_RECEIVED` and `INVENTORY_SCANNED` ledger events. Wrong-location scans are recorded as rejected inventory scans and create an `INVENTORY_ANOMALY_DETECTED` event.
 
 ## Batch Events
 
@@ -66,6 +79,46 @@ curl -X POST http://localhost:3000/api/v1/device-events/batch \
 ```
 
 Batch requests return per-item results. Duplicate nonces or invalid payloads are reported per event.
+
+## Inventory Scan Protocol
+
+Devices have two supported scan paths:
+
+| Path | Use when | Auth |
+| --- | --- | --- |
+| `POST /api/v1/device-events` | The device is sending a domain event that should be visible in the device audit stream and may also update inventory scan state. | `X-Device-Key` with `device.events.write` |
+| `POST /api/v1/inventory/scan` | The scanner is acting as a direct inventory scanner and does not need a separate device event envelope. | `X-Device-Key` with `device.events.write`, or bearer token with `inventory.write` |
+
+Direct device scan example:
+
+```sh
+curl -X POST http://localhost:3000/api/v1/inventory/scan \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: tnl_dev_example" \
+  -d '{
+    "value": "SKU-001",
+    "scanType": "barcode",
+    "locationId": "dock-a"
+  }'
+```
+
+Direct batch scan example:
+
+```sh
+curl -X POST http://localhost:3000/api/v1/inventory/scan/batch \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: tnl_dev_example" \
+  -d '{
+    "scans": [
+      { "value": "SKU-001", "scanType": "barcode", "locationId": "dock-a" },
+      { "value": "SERIAL-001", "scanType": "manual", "locationId": "dock-a" }
+    ]
+  }'
+```
+
+Inventory scan resolution is tenant-scoped. The server matches the submitted value against SKU or serial number. A scan with a `locationId` that differs from the item's current location returns `409`, but still records rejected scan provenance so operators can investigate the unexpected-location anomaly.
+
+Prefer `POST /api/v1/device-events` when the hardware event includes additional device-domain metadata that should be audited. Prefer direct inventory scan endpoints for simple scanner workflows where the inventory item state is the primary concern.
 
 ## SDK Examples
 
@@ -130,6 +183,8 @@ The source of truth for hardware examples is `DeviceHardwareExamples` in `@true-
 - Prefer batch ingestion only for catch-up or gateway forwarding. Do not batch routine low-latency events just to reduce request count.
 - Keep payloads domain-specific and compact. Single-event payloads are limited to 16 KiB; batch payloads are limited to 64 KiB total.
 - Include device-local timestamps when available. The server still records its own accepted timestamp.
+- Include `locationId` for inventory scans when the device knows the station or zone. This enables wrong-location anomaly detection.
+- Use `sku` or `serialNumber` when available. Use `barcode` when the scanner only has the raw encoded value.
 - Store device keys in device secret storage, never in logs or plain configuration files.
 
 ## Troubleshooting

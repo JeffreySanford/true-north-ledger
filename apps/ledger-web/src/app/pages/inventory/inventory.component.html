@@ -162,6 +162,28 @@
       </select>
     </label>
     <label><span>Scanned location ID (optional)</span><input formControlName="locationId" /></label>
+    @if (cameraScanAvailable) {
+      <div class="camera-scan-actions">
+        <input
+          #cameraScanInput
+          class="camera-scan-input"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          (change)="handleCameraScanFile($event)"
+          data-testid="inventory-camera-scan-input"
+        />
+        <button
+          type="button"
+          class="secondary-button"
+          (click)="startCameraScan(cameraScanInput)"
+          [disabled]="cameraScanning"
+          data-testid="inventory-camera-scan-button"
+        >
+          {{ cameraScanning ? 'Reading camera scan...' : 'Camera scan' }}
+        </button>
+      </div>
+    }
     <button type="submit" [disabled]="operatingItemId === 'scan'">
       {{ operatingItemId === 'scan' ? 'Scanning...' : 'Submit scan' }}
     </button>

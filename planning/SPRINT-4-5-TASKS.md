@@ -107,11 +107,11 @@ Sprint 1 through Sprint 4 are mostly complete from a product-flow perspective. T
 
 ## Documentation Follow-Ups
 
-- [ ] Create inventory integration guide.
-- [ ] Document device scan protocol.
-- [ ] Add inventory troubleshooting guide.
-- [ ] Add inventory setup instructions to README or development docs.
-- [ ] Update architecture diagram for completed auth, device, order, and inventory flows.
+- [x] Create inventory integration guide.
+- [x] Document device scan protocol.
+- [x] Add inventory troubleshooting guide.
+- [x] Add inventory setup instructions to README or development docs.
+- [x] Update architecture diagram for completed auth, device, order, and inventory flows.
 - [ ] Document current deferred items:
   - [ ] Real-time inventory push updates move to Sprint 5.
   - [ ] External inventory alert push/email delivery moves to Sprint 5.

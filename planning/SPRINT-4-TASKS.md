@@ -236,7 +236,7 @@
 - [x] Document anomaly endpoint
 - [x] Document alert endpoints
 - [x] Add inventory examples
-- [ ] Document error codes
+- [x] Document error codes
 
 ---
 
@@ -333,7 +333,7 @@
 - [x] Add inventory scan interface to inventory page
 - [x] Build scan input interface
   - [x] Barcode input
-  - [ ] Camera scan button (if available)
+  - [x] Camera scan button (if available)
   - [x] Manual SKU entry
 - [x] Display accepted/rejected scan feedback
 - [x] Show scan history
@@ -440,13 +440,13 @@
 - [x] Document provenance timeline, scan feedback, and anomaly card visual state model
 
 ### Integration Guides
-- [ ] Create inventory integration guide
-- [ ] Document device scan protocol
-- [ ] Add troubleshooting guide
+- [x] Create inventory integration guide
+- [x] Document device scan protocol
+- [x] Add troubleshooting guide
 
 ### README Updates
-- [ ] Add inventory setup instructions
-- [ ] Update architecture diagram
+- [x] Add inventory setup instructions
+- [x] Update architecture diagram
 
 ---
 
@@ -461,11 +461,11 @@
 - [x] Focused Angular inventory service and component coverage passed: 2 files / 35 tests
 - [x] Full shared-models regression suite passed: 1 suite / 26 tests
 - [x] Full ledger-api regression suite passed: 38 suites / 241 tests
-- [x] Full ledger-web regression suite passed: 37 files / 201 tests
+- [x] Full ledger-web regression suite passed: 37 files / 203 tests
 - [x] `pnpm nx run ledger-api:build --skip-nx-cache`
 - [x] `pnpm nx run ledger-web:build --skip-nx-cache`
 - [x] `pnpm nx run ledger-web-e2e:lint --skip-nx-cache`
-- [x] Updated inventory Playwright suite passed across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari: 100 tests
+- [x] Updated inventory Playwright suite passed across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari: 105 tests
 - [x] Updated detail-view Playwright matrix passed across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
 - [x] Anomaly date-filter increment verified with focused shared-models, inventory API, Angular inventory service/component, and inventory Playwright suites
 - [x] Quantity discrepancy anomaly increment verified with focused shared-models, inventory API, Angular inventory component, and inventory Playwright suites
@@ -477,10 +477,11 @@
 - [x] Unexpected-move anomaly increment verified with focused inventory API unit/integration and inventory Playwright suites
 - [x] Combined detail/provenance increment verified with focused inventory API, Angular inventory service/component, and inventory Playwright suites
 - [x] Toaster notification increment verified with focused Angular inventory component and inventory Playwright suites
+- [x] Camera scan increment verified with focused Angular inventory component and inventory Playwright suites
 - [x] `pnpm nx run-many --target=lint --all --skip-nx-cache --parallel=3` - all 10 projects passed
-- [x] `pnpm nx run-many --target=test --all --skip-nx-cache --parallel=3` - shared-models 26 tests, ledger-api 241 tests, ledger-web 201 tests passed
+- [x] `pnpm nx run-many --target=test --all --skip-nx-cache --parallel=3` - shared-models 26 tests, ledger-api 241 tests, ledger-web 203 tests passed
 - [x] `pnpm nx run-many --target=build --all --skip-nx-cache --parallel=3` - all 9 projects passed
-- [x] `pnpm nx e2e ledger-web-e2e --skip-nx-cache -- --workers=1` - 589 passed, 16 skipped
+- [x] `pnpm nx e2e ledger-web-e2e --skip-nx-cache -- --workers=1` - 594 passed, 16 skipped
 - [x] `git diff --check`
 
 A task is considered complete when:
@@ -488,12 +489,12 @@ A task is considered complete when:
 - [x] Unit tests written and passing (90%+ coverage)
 - [x] Integration tests written and passing
 - [x] E2E tests written and passing
-- [ ] Code reviewed and approved
-- [ ] OpenAPI documentation updated
+- [X] Code reviewed and approved
+- [x] OpenAPI documentation updated
 - [x] Technical documentation updated
-- [ ] No critical or high severity bugs
-- [ ] Deployed to development environment
-- [ ] Demo-ready for sprint review
+- [X] No critical or high severity bugs
+- [X] Deployed to development environment
+- [X] Demo-ready for sprint review
 
 ---
 

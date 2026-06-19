@@ -215,6 +215,10 @@ describe('InventoryComponent', () => {
     fixture.detectChanges();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders inventory and exposes a non-color low stock label', () => {
     expect(fixture.nativeElement.textContent).toContain('SKU-LOW');
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="low-stock-label"]')?.textContent).toContain('Low stock');
@@ -398,6 +402,43 @@ describe('InventoryComponent', () => {
     component.scanForm.patchValue({ value: '' });
     component.scanInventory();
     expect(component.error).toContain('SKU or serial number');
+  });
+
+  it('uses camera scan detection when the browser supports barcode detection', async () => {
+    const detect = vi.fn().mockResolvedValue([{ rawValue: ' SKU-CAMERA ' }]);
+    class MockBarcodeDetector {
+      detect = detect;
+    }
+    vi.stubGlobal('BarcodeDetector', MockBarcodeDetector);
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({}));
+    component.refreshCameraScanAvailability();
+
+    expect(component.cameraScanAvailable).toBe(true);
+
+    const file = new File(['scan'], 'scan.png', { type: 'image/png' });
+    const input = { files: [file], value: 'scan.png' } as unknown as HTMLInputElement;
+
+    await component.handleCameraScanFile({ target: input } as unknown as Event);
+
+    expect(component.scanForm.controls.value.value).toBe('SKU-CAMERA');
+    expect(component.scanForm.controls.scanType.value).toBe('barcode');
+    expect(component.success).toContain('Camera scan detected SKU-CAMERA');
+    expect(component.cameraScanning).toBe(false);
+    expect(input.value).toBe('');
+    expect(detect).toHaveBeenCalled();
+  });
+
+  it('keeps camera scan hidden and reports unsupported browsers', () => {
+    vi.stubGlobal('BarcodeDetector', undefined);
+    component.refreshCameraScanAvailability();
+
+    expect(component.cameraScanAvailable).toBe(false);
+
+    const input = { click: vi.fn() } as unknown as HTMLInputElement;
+    component.startCameraScan(input);
+
+    expect(input.click).not.toHaveBeenCalled();
+    expect(component.error).toContain('Camera barcode scanning is not available');
   });
 
   it('shows an explicit wrong-location scan rejection', () => {

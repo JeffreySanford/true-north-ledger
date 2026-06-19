@@ -475,6 +475,43 @@ test('inventory page submits a scan and shows accessible accepted feedback', asy
   expect(scanPayload).toEqual({ value: 'SERIAL-LOW-001', scanType: 'barcode', locationId: 'AUSTIN-A1' });
 });
 
+test('inventory page exposes camera scan when barcode detection is available', async ({ page }) => {
+  await page.addInitScript(() => {
+    class MockBarcodeDetector {
+      async detect() {
+        return [{ rawValue: 'SKU-CAMERA' }];
+      }
+    }
+    Object.defineProperty(window, 'BarcodeDetector', {
+      configurable: true,
+      value: MockBarcodeDetector,
+    });
+    Object.defineProperty(window, 'createImageBitmap', {
+      configurable: true,
+      value: async () => ({}),
+    });
+  });
+  await page.route('**/api/v1/inventory**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [buildItem()], total: 1, page: 1, pageSize: 10 }),
+    });
+  });
+
+  await page.goto('/inventory');
+  const scanForm = page.getByTestId('inventory-scan-form');
+  await expect(scanForm.getByTestId('inventory-camera-scan-button')).toBeVisible();
+  await scanForm.getByTestId('inventory-camera-scan-input').setInputFiles({
+    name: 'scan.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('camera scan'),
+  });
+
+  await expect(scanForm.locator('input[formcontrolname="value"]')).toHaveValue('SKU-CAMERA');
+  await expect(page.getByTestId('inventory-success')).toContainText('Camera scan detected SKU-CAMERA');
+});
+
 test('inventory page shows rejected scan feedback without relying on motion', async ({ page }) => {
   await page.route('**/api/v1/inventory**', async (route) => {
     const request = route.request();

@@ -1,6 +1,8 @@
 # Inventory Management
 
-Sprint 4 introduces tenant-scoped inventory tracking with ledger-backed provenance. The initial vertical slice supports adding inventory and listing it with filters, sorting, and pagination.
+Sprint 4 introduces tenant-scoped inventory tracking with ledger-backed provenance. The implemented vertical slice supports inventory creation, import, list/detail retrieval, reservations, movement, quantity/status changes, scan tracking, provenance, anomalies, alerts, and an Angular operations dashboard.
+
+Implementation-oriented examples are documented in [Inventory Integration Guide](inventory-integration-guide.md). Operational failure handling is documented in [Inventory Troubleshooting](inventory-troubleshooting.md).
 
 ## Data Model
 
@@ -171,8 +173,21 @@ Alert delivery and persisted anomaly resolution remain planned.
 
 `POST /api/v1/inventory/alerts/generate` requires `inventory.write`, returns the same current alerts, and appends an alert-specific ledger event for each finding. Low-stock alerts use each item's `metadata.minimumQuantity` threshold or default to 5. Expiring-soon alerts use `metadata.expirationAlertDays` or default to 30 days. Other detected inventory anomalies become anomaly alerts.
 
-The Angular inventory page displays alert severity, affected item and location, message, and an explicit recommended action. Inventory success and error notifications, including alert generation, are delivered through Material toaster notifications while retaining inline status text for accessible page context. External push/email delivery remains planned because the platform does not yet provide those notification transports.
+The Angular inventory page displays alert severity, affected item and location, message, and an explicit recommended action. Inventory success and error notifications, including alert generation, are delivered through in-app toaster notifications while retaining inline status text for accessible page context. External push/email delivery remains planned because the platform does not yet provide those notification transports.
+
+## Error Responses
+
+Inventory contracts define these domain error codes:
+
+| Code | Typical HTTP status | Meaning |
+| --- | --- | --- |
+| `INVENTORY_INVALID_REQUEST` | `400` | Payload, filter, date range, pagination, or sort validation failed |
+| `INVENTORY_NOT_FOUND` | `404` | Inventory item, SKU, provenance target, or tenant-scoped resource is absent |
+| `INVENTORY_CONFLICT` | `409` | Duplicate SKU, over-reservation, no-op movement, removed item mutation, quantity conflict, or wrong-location scan |
+| `INVENTORY_FORBIDDEN` | `403` | Caller lacks the required inventory permission |
+
+Authentication failures return `401`. Rate-limited inventory writes return `429`. Device-originated scan authentication errors may also use device error codes documented in [Device Event Ingestion Guide](device-event-ingestion-guide.md).
 
 ## Current Scope
 
-External push/email alert delivery, anomaly resolution, location registry validation, and real-time inventory updates remain planned Sprint 4 increments.
+External push/email alert delivery, persisted anomaly resolution, location registry validation, reservation timeout background scheduling, and real-time inventory push updates remain planned future work.
