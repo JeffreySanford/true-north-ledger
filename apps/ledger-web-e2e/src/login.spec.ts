@@ -704,6 +704,13 @@ test('enforces planned route permission metadata matrix across web, tablet, and 
       body: JSON.stringify({ orders: [], total: 0, page: 1, pageSize: 20 }),
     });
   });
+  await page.route('**/api/v1/inventory**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], total: 0, page: 1, pageSize: 10 }),
+    });
+  });
 
   await page.addInitScript(() => {
     window.localStorage.setItem('tnl.authToken', 'matrix-admin-token');

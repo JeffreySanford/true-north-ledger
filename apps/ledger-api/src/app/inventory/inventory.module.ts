@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { DevicesModule } from '../devices/devices.module';
@@ -10,7 +10,7 @@ import { InventoryScanController } from './inventory-scan.controller';
 import { InventoryService } from './inventory.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([InventoryItemEntity]), AuthModule, DevicesModule, LedgerEventsModule],
+  imports: [TypeOrmModule.forFeature([InventoryItemEntity]), AuthModule, forwardRef(() => DevicesModule), LedgerEventsModule],
   controllers: [InventoryController, InventoryScanController],
   providers: [InventoryService, InventoryScanAuthGuard],
   exports: [InventoryService],

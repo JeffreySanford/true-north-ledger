@@ -143,6 +143,19 @@ describe('OrderCreateComponent', () => {
     });
   });
 
+  it('autocompletes catalog values when SKU form control changes', () => {
+    component.addItem();
+    const addedItem = component.items.at(1);
+
+    addedItem.controls.sku.setValue('SKU-COLD');
+
+    expect(addedItem.getRawValue()).toMatchObject({
+      sku: 'SKU-COLD',
+      itemName: 'Cold-chain monitor',
+      unitPrice: 72,
+    });
+  });
+
   it('rejects invalid metadata before calling the API', () => {
     component.createForm.controls.metadata.setValue('{invalid');
     component.submitCreate();

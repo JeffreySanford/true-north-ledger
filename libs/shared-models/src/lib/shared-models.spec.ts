@@ -10,15 +10,24 @@ import {
   CreateInventoryItemRequestSchema,
   InventoryItemExample,
   InventoryItemSchema,
+  InventoryAnomalyListRequestSchema,
   InventoryAlertListResponseSchema,
   InventoryAnomalyListResponseSchema,
+  InventoryBulkMoveRequestSchema,
+  InventoryBulkMoveResponseSchema,
+  InventoryExpiredReservationReleaseResponseSchema,
+  InventoryImportRequestSchema,
+  InventoryImportResponseSchema,
   InventoryLedgerEventActionSchema,
   InventoryMoveRequestSchema,
+  InventoryOperationTypeSchema,
   InventoryProvenanceResponseSchema,
+  InventoryQuantityAdjustmentRequestSchema,
   InventoryRemovalRequestSchema,
   InventoryScanRequestSchema,
   InventoryReservationReleaseRequestSchema,
   InventoryReservationRequestSchema,
+  InventoryStatusChangeRequestSchema,
   InventoryStatusSchema,
   OrderExample,
   OrderLedgerEventActionSchema,
@@ -232,6 +241,10 @@ describe('shared-models', () => {
       'removed',
     ]);
     expect(InventoryLedgerEventActionSchema.options).toContain('INVENTORY_ADDED');
+    expect(InventoryOperationTypeSchema.options).toEqual(expect.arrayContaining([
+      'adjust_quantity',
+      'change_status',
+    ]));
   });
 
   it('normalizes inventory SKUs and rejects negative quantities', () => {
@@ -249,14 +262,24 @@ describe('shared-models', () => {
     expect(InventoryReservationRequestSchema.parse({
       quantity: 5,
       orderId: '77777777-7777-4777-8777-777777777777',
+      timeoutMinutes: 30,
     })).toEqual({
       quantity: 5,
       orderId: '77777777-7777-4777-8777-777777777777',
+      timeoutMinutes: 30,
     });
     expect(InventoryReservationReleaseRequestSchema.parse({ reason: 'Order cancelled' })).toEqual({
       reason: 'Order cancelled',
     });
     expect(() => InventoryReservationRequestSchema.parse({ quantity: 0 })).toThrow();
+    expect(() => InventoryReservationRequestSchema.parse({ quantity: 1, timeoutMinutes: 0 })).toThrow();
+    expect(InventoryExpiredReservationReleaseResponseSchema.parse({
+      released: [InventoryItemExample],
+      total: 1,
+    })).toEqual({
+      released: [InventoryItemExample],
+      total: 1,
+    });
   });
 
   it('validates inventory movement destinations', () => {
@@ -270,6 +293,73 @@ describe('shared-models', () => {
       reason: 'Cycle count',
     });
     expect(() => InventoryMoveRequestSchema.parse({ locationId: '', locationName: '' })).toThrow();
+  });
+
+  it('validates inventory bulk movement contracts', () => {
+    const request = InventoryBulkMoveRequestSchema.parse({
+      itemIds: [
+        '55555555-5555-4555-8555-555555555555',
+        '66666666-6666-4666-8666-666666666666',
+      ],
+      locationId: 'AUSTIN-C3',
+      locationName: 'Austin Warehouse - Aisle C3',
+      reason: 'Bulk aisle rebalance',
+    });
+    expect(request.itemIds).toHaveLength(2);
+    expect(() => InventoryBulkMoveRequestSchema.parse({
+      itemIds: [],
+      locationId: 'AUSTIN-C3',
+      locationName: 'Austin Warehouse - Aisle C3',
+    })).toThrow();
+
+    const response = InventoryBulkMoveResponseSchema.parse({
+      results: [
+        { index: 0, itemId: request.itemIds[0], success: true, item: InventoryItemExample },
+        { index: 1, itemId: request.itemIds[1], success: false, error: 'Inventory item not found' },
+      ],
+    });
+    expect(response.results.map((result) => result.success)).toEqual([true, false]);
+  });
+
+  it('validates inventory batch import contracts', () => {
+    const request = InventoryImportRequestSchema.parse({
+      items: [
+        {
+          ...CreateInventoryItemRequestExample,
+          sku: 'sku-import-1',
+          name: 'Imported sensor one',
+        },
+      ],
+    });
+    expect(request.items[0].sku).toBe('SKU-IMPORT-1');
+    expect(() => InventoryImportRequestSchema.parse({ items: [] })).toThrow();
+
+    const response = InventoryImportResponseSchema.parse({
+      results: [
+        { index: 0, sku: 'SKU-IMPORT-1', success: true, item: { ...InventoryItemExample, sku: 'SKU-IMPORT-1' } },
+        { index: 1, sku: 'SKU-100', success: false, error: 'Inventory SKU SKU-100 already exists for tenant' },
+      ],
+    });
+    expect(response.results.map((result) => result.success)).toEqual([true, false]);
+  });
+
+  it('validates inventory quantity and status operation contracts', () => {
+    expect(InventoryQuantityAdjustmentRequestSchema.parse({
+      quantity: 18,
+      reason: 'Cycle count reconciliation',
+    })).toEqual({
+      quantity: 18,
+      reason: 'Cycle count reconciliation',
+    });
+    expect(InventoryStatusChangeRequestSchema.parse({
+      status: 'damaged',
+      reason: 'Quality hold',
+    })).toEqual({
+      status: 'damaged',
+      reason: 'Quality hold',
+    });
+    expect(() => InventoryQuantityAdjustmentRequestSchema.parse({ quantity: -1, reason: 'Invalid' })).toThrow();
+    expect(() => InventoryStatusChangeRequestSchema.parse({ status: 'quarantined', reason: 'Invalid' })).toThrow();
   });
 
   it('requires a reason for inventory removal', () => {
@@ -286,10 +376,12 @@ describe('shared-models', () => {
       value: ' SKU-100 ',
       scanType: 'barcode',
       locationId: 'AUSTIN-A1',
+      sourceEventType: 'inventory.scan',
     })).toEqual({
       value: 'SKU-100',
       scanType: 'barcode',
       locationId: 'AUSTIN-A1',
+      sourceEventType: 'inventory.scan',
     });
     expect(() => InventoryScanRequestSchema.parse({ value: '', scanType: 'camera' })).toThrow();
   });
@@ -313,11 +405,32 @@ describe('shared-models', () => {
         chainSequence: 1,
         eventHash: 'hash-1',
       }],
+      reservationHistory: [],
+      scanHistory: [],
     });
     expect(response.events[0].action).toBe('INVENTORY_ADDED');
   });
 
   it('validates inventory anomaly severity, status, and remediation', () => {
+    expect(InventoryAnomalyListRequestSchema.parse({
+      type: 'low_stock',
+      severity: 'warning',
+      detectedFrom: '2026-06-01',
+      detectedTo: '2026-06-30',
+    })).toEqual({
+      type: 'low_stock',
+      severity: 'warning',
+      detectedFrom: '2026-06-01',
+      detectedTo: '2026-06-30',
+    });
+    expect(() => InventoryAnomalyListRequestSchema.parse({
+      detectedFrom: '2026-06-30',
+      detectedTo: '2026-06-01',
+    })).toThrow();
+    expect(InventoryAnomalyListRequestSchema.parse({ type: 'quantity_discrepancy' })).toEqual({
+      type: 'quantity_discrepancy',
+    });
+
     const response = InventoryAnomalyListResponseSchema.parse({
       anomalies: [{
         id: `${InventoryItemExample.id}:low_stock`,

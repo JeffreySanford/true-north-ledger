@@ -86,9 +86,56 @@ describe('InventoryController (Integration)', () => {
     ]);
   });
 
+  it('imports inventory with partial success and ledger events for accepted rows', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/inventory/import')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        items: [
+          { ...payload, sku: 'SKU-IMPORT-1', name: 'Imported sensor one' },
+          { ...payload, sku: 'SKU-100', name: 'Duplicate serialized sensor kit' },
+        ],
+      })
+      .expect(200);
+
+    expect(response.body.results).toEqual([
+      expect.objectContaining({
+        index: 0,
+        sku: 'SKU-IMPORT-1',
+        success: true,
+        item: expect.objectContaining({ sku: 'SKU-IMPORT-1', tenantId }),
+      }),
+      expect.objectContaining({
+        index: 1,
+        sku: 'SKU-100',
+        success: false,
+        error: 'Inventory SKU SKU-100 already exists for tenant',
+      }),
+    ]);
+
+    const events = await dataSource.query(
+      `SELECT payload->>'action' AS action, payload->>'sku' AS sku
+       FROM ledger_events
+       WHERE payload->>'sku' = $1 AND payload->>'action' = $2`,
+      ['SKU-IMPORT-1', InventoryLedgerEventAction.INVENTORY_ADDED],
+    );
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: InventoryLedgerEventAction.INVENTORY_ADDED,
+        sku: 'SKU-IMPORT-1',
+      }),
+    ]);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/inventory/import')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ items: [] })
+      .expect(400);
+  });
+
   it('filters inventory and isolates tenant records', async () => {
     const tenantList = await request(app.getHttpServer())
-      .get('/api/v1/inventory?status=available&locationId=AUSTIN-A1&query=sensor')
+      .get('/api/v1/inventory?status=available&locationId=AUSTIN-A1&query=serialized')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     expect(tenantList.body).toMatchObject({ total: 1, page: 1, pageSize: 25 });
@@ -112,6 +159,17 @@ describe('InventoryController (Integration)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     expect(byId.body).toMatchObject({ id, sku: 'SKU-100', metadata: { source: 'integration' } });
+
+    const withProvenance = await request(app.getHttpServer())
+      .get(`/api/v1/inventory/${id}?includeProvenance=true`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(withProvenance.body).toMatchObject({
+      item: expect.objectContaining({ id, sku: 'SKU-100' }),
+      events: [expect.objectContaining({ action: InventoryLedgerEventAction.INVENTORY_ADDED })],
+      reservationHistory: [],
+      scanHistory: [],
+    });
 
     const bySku = await request(app.getHttpServer())
       .get('/api/v1/inventory/sku/sku-100')
@@ -188,6 +246,58 @@ describe('InventoryController (Integration)', () => {
     ]);
   });
 
+  it('releases expired reservations through the timeout workflow', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/inventory')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...payload, sku: 'SKU-TIMEOUT', quantity: 9 })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/inventory/${created.body.id}/reserve`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ quantity: 3, timeoutMinutes: 1 })
+      .expect(200);
+
+    await dataSource.query(
+      `UPDATE inventory_items
+       SET metadata = jsonb_set(metadata, '{reservationExpiresAt}', to_jsonb($1::text), true)
+       WHERE id = $2`,
+      ['2026-06-11T11:00:00.000Z', created.body.id],
+    );
+
+    const released = await request(app.getHttpServer())
+      .post('/api/v1/inventory/reservations/release-expired')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(released.body).toMatchObject({
+      total: 1,
+      released: [expect.objectContaining({
+        id: created.body.id,
+        quantity: 9,
+        reservedQuantity: 0,
+        status: 'available',
+      })],
+    });
+
+    const events = await dataSource.query(
+      `SELECT payload->>'action' AS action, payload->>'reason' AS reason,
+              payload->>'reservationExpiredAt' AS reservation_expired_at
+       FROM ledger_events WHERE subject_id = $1 ORDER BY created_at`,
+      [created.body.id],
+    );
+    expect(events).toEqual([
+      expect.objectContaining({ action: InventoryLedgerEventAction.INVENTORY_ADDED }),
+      expect.objectContaining({ action: InventoryLedgerEventAction.INVENTORY_RESERVED }),
+      expect.objectContaining({
+        action: InventoryLedgerEventAction.INVENTORY_RESERVATION_RELEASED,
+        reason: 'Reservation timeout expired',
+        reservation_expired_at: '2026-06-11T11:00:00.000Z',
+      }),
+    ]);
+  });
+
   it('moves inventory and records from/to locations with actor attribution', async () => {
     const item = await dataSource.query(`SELECT id FROM inventory_items WHERE tenant_id = $1 AND sku = 'SKU-100'`, [tenantId]);
     const id = item[0].id;
@@ -224,6 +334,103 @@ describe('InventoryController (Integration)', () => {
       .set('Authorization', `Bearer ${otherTenantToken}`)
       .send({ locationId: 'OTHER-C1', locationName: 'Other Tenant Location' })
       .expect(404);
+  });
+
+  it('bulk moves inventory with per-item results and ledger events for accepted moves', async () => {
+    const existing = await dataSource.query(`SELECT id FROM inventory_items WHERE tenant_id = $1 AND sku = 'SKU-100'`, [tenantId]);
+    const firstId = existing[0].id;
+    const second = await request(app.getHttpServer())
+      .post('/api/v1/inventory')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...payload, sku: 'SKU-BULK-MOVE', quantity: 9 })
+      .expect(201);
+    const missingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/inventory/move/batch')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        itemIds: [firstId, second.body.id, missingId],
+        locationId: 'AUSTIN-C3',
+        locationName: 'Austin Warehouse - Aisle C3',
+        reason: 'Bulk aisle rebalance',
+      })
+      .expect(200);
+
+    expect(response.body.results).toEqual([
+      expect.objectContaining({ index: 0, itemId: firstId, success: true, item: expect.objectContaining({ locationId: 'AUSTIN-C3' }) }),
+      expect.objectContaining({ index: 1, itemId: second.body.id, success: true, item: expect.objectContaining({ locationName: 'Austin Warehouse - Aisle C3' }) }),
+      expect.objectContaining({ index: 2, itemId: missingId, success: false, error: `Inventory item ${missingId} not found` }),
+    ]);
+
+    const events = await dataSource.query(
+      `SELECT subject_id, payload->>'action' AS action, payload->>'reason' AS reason
+       FROM ledger_events
+       WHERE subject_id = ANY($1::text[]) AND payload->>'action' = $2`,
+      [[firstId, second.body.id], InventoryLedgerEventAction.INVENTORY_MOVED],
+    );
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ subject_id: firstId, action: InventoryLedgerEventAction.INVENTORY_MOVED, reason: 'Bulk aisle rebalance' }),
+      expect.objectContaining({ subject_id: second.body.id, action: InventoryLedgerEventAction.INVENTORY_MOVED, reason: 'Bulk aisle rebalance' }),
+    ]));
+
+    await request(app.getHttpServer())
+      .post('/api/v1/inventory/move/batch')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ itemIds: [], locationId: 'AUSTIN-C3', locationName: 'Austin Warehouse - Aisle C3' })
+      .expect(400);
+  });
+
+  it('adjusts quantity and changes status with ledger provenance and guarded transitions', async () => {
+    const item = await dataSource.query(`SELECT id FROM inventory_items WHERE tenant_id = $1 AND sku = 'SKU-100'`, [tenantId]);
+    const id = item[0].id;
+
+    const adjusted = await request(app.getHttpServer())
+      .patch(`/api/v1/inventory/${id}/quantity`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ quantity: 18, reason: 'Cycle count reconciliation' })
+      .expect(200);
+    expect(adjusted.body).toMatchObject({ quantity: 18, status: 'available' });
+
+    const changed = await request(app.getHttpServer())
+      .patch(`/api/v1/inventory/${id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'damaged', reason: 'Quality hold' })
+      .expect(200);
+    expect(changed.body).toMatchObject({ quantity: 18, status: 'damaged' });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/inventory/${id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'reserved', reason: 'Must use reservation workflow' })
+      .expect(409);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/inventory/${id}/status`)
+      .set('Authorization', `Bearer ${otherTenantToken}`)
+      .send({ status: 'expired', reason: 'Other tenant cannot change it' })
+      .expect(404);
+
+    const events = await dataSource.query(
+      `SELECT payload->>'action' AS action, payload->>'previousQuantity' AS previous_quantity,
+              payload->>'adjustedQuantity' AS adjusted_quantity, payload->>'previousStatus' AS previous_status,
+              payload->>'status' AS status
+       FROM ledger_events WHERE subject_id = $1 AND payload->>'action' IN ($2, $3)
+       ORDER BY created_at`,
+      [id, InventoryLedgerEventAction.INVENTORY_QUANTITY_ADJUSTED, InventoryLedgerEventAction.INVENTORY_STATUS_CHANGED],
+    );
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: InventoryLedgerEventAction.INVENTORY_QUANTITY_ADJUSTED,
+        previous_quantity: '25',
+        adjusted_quantity: '18',
+      }),
+      expect.objectContaining({
+        action: InventoryLedgerEventAction.INVENTORY_STATUS_CHANGED,
+        previous_status: 'available',
+        status: 'damaged',
+      }),
+    ]);
   });
 
   it('soft-removes inventory, retains the record, and prevents reserved removal', async () => {
@@ -320,6 +527,142 @@ describe('InventoryController (Integration)', () => {
       .expect(404);
   });
 
+  it('tracks inventory automatically from inventory.scan device events', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/inventory')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...payload, sku: 'SKU-DEVICE-EVENT', name: 'Device event tracked sensor' })
+      .expect(201);
+
+    const registration = await request(app.getHttpServer())
+      .post('/api/v1/devices/register')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: `Inventory event scanner ${Date.now()}`, type: 'scanner' })
+      .expect(201);
+
+    const ingested = await request(app.getHttpServer())
+      .post('/api/v1/device-events')
+      .set('X-Device-Key', registration.body.apiKey)
+      .send({
+        eventType: 'inventory.scan',
+        nonce: 'inventory-device-event-scan-1',
+        payload: { sku: 'sku-device-event', scanType: 'barcode', locationId: 'AUSTIN-A1' },
+      })
+      .expect(201);
+
+    expect(ingested.body).toMatchObject({
+      eventId: expect.any(String),
+      nonce: 'inventory-device-event-scan-1',
+    });
+
+    const events = await dataSource.query(
+      `SELECT actor_id, actor_type, payload->>'action' AS action, payload->>'deviceId' AS device_id,
+              payload->>'scanType' AS scan_type, payload->>'scanValue' AS scan_value,
+              payload->>'sourceEventType' AS source_event_type
+       FROM ledger_events WHERE subject_id = $1 AND payload->>'action' = $2`,
+      [created.body.id, InventoryLedgerEventAction.INVENTORY_SCANNED],
+    );
+    expect(events).toEqual([
+      expect.objectContaining({
+        actor_id: registration.body.id,
+        actor_type: 'device',
+        device_id: registration.body.id,
+        scan_type: 'barcode',
+        scan_value: 'sku-device-event',
+        source_event_type: 'inventory.scan',
+      }),
+    ]);
+  });
+
+  it('bulk scans inventory with per-item results and device attribution', async () => {
+    const registration = await request(app.getHttpServer())
+      .post('/api/v1/devices/register')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: `Bulk inventory scanner ${Date.now()}`, type: 'scanner' })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/inventory/scan/batch')
+      .set('X-Device-Key', registration.body.apiKey)
+      .send({
+        scans: [
+          { value: 'SKU-SCAN', scanType: 'barcode', locationId: 'AUSTIN-A1' },
+          { value: 'UNKNOWN', scanType: 'barcode', locationId: 'AUSTIN-A1' },
+        ],
+      })
+      .expect(200);
+
+    expect(response.body.results).toEqual([
+      expect.objectContaining({ index: 0, value: 'SKU-SCAN', success: true, item: expect.objectContaining({ sku: 'SKU-SCAN' }) }),
+      expect.objectContaining({ index: 1, value: 'UNKNOWN', success: false, error: 'Inventory item UNKNOWN not found' }),
+    ]);
+    const events = await dataSource.query(
+      `SELECT actor_id, payload->>'deviceId' AS device_id FROM ledger_events
+       WHERE subject_id = $1 AND payload->>'action' = $2 ORDER BY created_at DESC LIMIT 1`,
+      [response.body.results[0].item.id, InventoryLedgerEventAction.INVENTORY_SCANNED],
+    );
+    expect(events).toEqual([
+      expect.objectContaining({ actor_id: registration.body.id, device_id: registration.body.id }),
+    ]);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/inventory/scan/batch')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ scans: [] })
+      .expect(400);
+  });
+
+  it('rejects wrong-location scans, exposes the anomaly, and clears it after confirmation', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/inventory')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...payload, sku: 'SKU-LOCATION', quantity: 10 })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/inventory/scan')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ value: 'SKU-LOCATION', scanType: 'manual', locationId: 'AUSTIN-B2' })
+      .expect(409);
+
+    const anomaly = await request(app.getHttpServer())
+      .get('/api/v1/inventory/anomalies?type=unexpected_location&severity=error')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(anomaly.body).toMatchObject({
+      total: 1,
+      anomalies: [expect.objectContaining({
+        itemId: created.body.id,
+        type: 'unexpected_location',
+        details: expect.objectContaining({ expectedLocationId: 'AUSTIN-A1', scannedLocationId: 'AUSTIN-B2' }),
+      })],
+    });
+
+    const events = await dataSource.query(
+      `SELECT payload->>'action' AS action, payload->>'accepted' AS accepted,
+              payload->>'anomalyType' AS anomaly_type
+       FROM ledger_events WHERE subject_id = $1 ORDER BY created_at`,
+      [created.body.id],
+    );
+    expect(events).toEqual([
+      expect.objectContaining({ action: InventoryLedgerEventAction.INVENTORY_ADDED }),
+      expect.objectContaining({ action: InventoryLedgerEventAction.INVENTORY_SCANNED, accepted: 'false' }),
+      expect.objectContaining({ action: InventoryLedgerEventAction.INVENTORY_ANOMALY_DETECTED, anomaly_type: 'unexpected_location' }),
+    ]);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/inventory/scan')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ value: 'SKU-LOCATION', scanType: 'manual', locationId: 'AUSTIN-A1' })
+      .expect(200);
+
+    const cleared = await request(app.getHttpServer())
+      .get('/api/v1/inventory/anomalies?type=unexpected_location')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(cleared.body).toEqual({ anomalies: [], total: 0 });
+  });
+
   it('returns a tenant-isolated chronological provenance chain', async () => {
     const item = await dataSource.query(`SELECT id FROM inventory_items WHERE tenant_id = $1 AND sku = 'SKU-SCAN'`, [tenantId]);
     const id = item[0].id;
@@ -333,6 +676,7 @@ describe('InventoryController (Integration)', () => {
       InventoryLedgerEventAction.INVENTORY_ADDED,
       InventoryLedgerEventAction.INVENTORY_SCANNED,
       InventoryLedgerEventAction.INVENTORY_SCANNED,
+      InventoryLedgerEventAction.INVENTORY_SCANNED,
     ]);
     expect(response.body.events[2]).toMatchObject({
       actorType: 'device',
@@ -341,6 +685,11 @@ describe('InventoryController (Integration)', () => {
       quantity: 25,
     });
     expect(response.body.events[0].chainSequence).toBeLessThan(response.body.events[1].chainSequence);
+    expect(response.body.scanHistory).toHaveLength(3);
+    expect(response.body.scanHistory.every(
+      (event: { action: string }) => event.action === InventoryLedgerEventAction.INVENTORY_SCANNED,
+    )).toBe(true);
+    expect(response.body.reservationHistory).toEqual([]);
 
     await request(app.getHttpServer())
       .get(`/api/v1/inventory/${id}/provenance`)
@@ -352,7 +701,17 @@ describe('InventoryController (Integration)', () => {
     const created = await request(app.getHttpServer())
       .post('/api/v1/inventory')
       .set('Authorization', `Bearer ${token}`)
-      .send({ ...payload, sku: 'SKU-ANOMALY', quantity: 2, expirationDate: '2026-01-01' })
+      .send({
+        ...payload,
+        sku: 'SKU-ANOMALY',
+        quantity: 2,
+        expirationDate: '2026-01-01',
+        metadata: {
+          expectedQuantity: 5,
+          expectedLocationId: 'AUSTIN-C3',
+          expectedLocationName: 'Austin Warehouse - Aisle C3',
+        },
+      })
       .expect(201);
     await dataSource.query(`UPDATE inventory_items SET status = 'damaged' WHERE id = $1`, [created.body.id]);
 
@@ -364,6 +723,48 @@ describe('InventoryController (Integration)', () => {
       total: 1,
       anomalies: [expect.objectContaining({ itemId: created.body.id, type: 'expired', severity: 'critical', status: 'open' })],
     });
+    const detectedDate = critical.body.anomalies[0].detectedAt.slice(0, 10);
+    const dated = await request(app.getHttpServer())
+      .get(`/api/v1/inventory/anomalies?detectedFrom=${detectedDate}&detectedTo=${detectedDate}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(dated.body.anomalies).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: created.body.id, type: 'expired' }),
+    ]));
+
+    await request(app.getHttpServer())
+      .get('/api/v1/inventory/anomalies?detectedFrom=2026-06-12&detectedTo=2026-06-11')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+
+    const discrepancy = await request(app.getHttpServer())
+      .get('/api/v1/inventory/anomalies?type=quantity_discrepancy&severity=error')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(discrepancy.body).toMatchObject({
+      total: 1,
+      anomalies: [expect.objectContaining({
+        itemId: created.body.id,
+        type: 'quantity_discrepancy',
+        details: expect.objectContaining({ quantity: 2, expectedQuantity: 5, delta: -3 }),
+      })],
+    });
+
+    const unexpectedMove = await request(app.getHttpServer())
+      .get('/api/v1/inventory/anomalies?type=unexpected_location&severity=error')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(unexpectedMove.body).toMatchObject({
+      total: 1,
+      anomalies: [expect.objectContaining({
+        itemId: created.body.id,
+        type: 'unexpected_location',
+        details: expect.objectContaining({
+          currentLocationId: 'AUSTIN-A1',
+          expectedLocationId: 'AUSTIN-C3',
+        }),
+      })],
+    });
 
     const detected = await request(app.getHttpServer())
       .post('/api/v1/inventory/anomalies/detect')
@@ -374,6 +775,8 @@ describe('InventoryController (Integration)', () => {
       expect.objectContaining({ itemId: created.body.id, type: 'low_stock' }),
       expect.objectContaining({ itemId: created.body.id, type: 'expired' }),
       expect.objectContaining({ itemId: created.body.id, type: 'damaged_not_removed' }),
+      expect.objectContaining({ itemId: created.body.id, type: 'quantity_discrepancy' }),
+      expect.objectContaining({ itemId: created.body.id, type: 'unexpected_location' }),
     ]));
 
     const events = await dataSource.query(
@@ -382,7 +785,7 @@ describe('InventoryController (Integration)', () => {
       [created.body.id, InventoryLedgerEventAction.INVENTORY_ANOMALY_DETECTED],
     );
     expect(events.map((event: { anomaly_type: string }) => event.anomaly_type)).toEqual(
-      expect.arrayContaining(['low_stock', 'expired', 'damaged_not_removed']),
+      expect.arrayContaining(['low_stock', 'expired', 'damaged_not_removed', 'quantity_discrepancy', 'unexpected_location']),
     );
 
     const isolated = await request(app.getHttpServer())

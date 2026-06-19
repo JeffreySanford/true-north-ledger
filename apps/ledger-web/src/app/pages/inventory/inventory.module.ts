@@ -4,9 +4,10 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { VisualPrimitivesModule } from '../../shared/visual-primitives.module';
 import { InventoryComponent } from './inventory.component';
+import { InventoryDashboardComponent } from './inventory-dashboard.component';
 
 @NgModule({
-  declarations: [InventoryComponent],
+  declarations: [InventoryComponent, InventoryDashboardComponent],
   imports: [
     CommonModule,
     ReactiveFormsModule,

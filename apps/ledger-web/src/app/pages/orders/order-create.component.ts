@@ -149,6 +149,9 @@ export class OrderCreateComponent implements OnDestroy {
   }
 
   public applyCatalogItem(index: number): void {
+    if (index < 0 || index >= this.items.length) {
+      return;
+    }
     const item = this.items.at(index);
     const catalogItem = this.itemCatalog.find((candidate) => candidate.sku === item.controls.sku.value.trim());
     if (catalogItem) {
@@ -200,12 +203,18 @@ export class OrderCreateComponent implements OnDestroy {
       unitPrice: 49.5,
     },
   ): OrderItemForm {
-    return this.formBuilder.nonNullable.group({
+    const group = this.formBuilder.nonNullable.group({
       sku: [value.sku, [Validators.required]],
       itemName: [value.itemName, [Validators.required]],
       quantity: [value.quantity, [Validators.required, Validators.min(1)]],
       unitPrice: [value.unitPrice, [Validators.required, Validators.min(0)]],
     });
+
+    group.controls.sku.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.applyCatalogItem(this.items.controls.indexOf(group)));
+
+    return group;
   }
 
   private isCreateStepValid(step: number): boolean {

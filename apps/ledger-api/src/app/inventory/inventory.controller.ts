@@ -37,14 +37,22 @@ import {
   InventoryAlertSeveritySchema,
   InventoryAlertTypeSchema,
   InventoryAnomalyListResponse,
+  InventoryAnomalyListRequestSchema,
   InventoryAnomalySeveritySchema,
   InventoryAnomalyTypeSchema,
+  InventoryBulkMoveRequestSchema,
+  InventoryBulkMoveResponse,
+  InventoryExpiredReservationReleaseResponse,
+  InventoryImportRequestSchema,
+  InventoryImportResponse,
   InventoryListResponse,
   InventoryMoveRequestSchema,
   InventoryProvenanceResponse,
+  InventoryQuantityAdjustmentRequestSchema,
   InventoryReservationReleaseRequestSchema,
   InventoryReservationRequestSchema,
   InventoryRemovalRequestSchema,
+  InventoryStatusChangeRequestSchema,
   InventoryStatusSchema,
 } from '@true-north-ledger/inventory-contracts';
 import { PermissionsGuard } from '../auth/permissions.guard';
@@ -130,24 +138,53 @@ export class InventoryController {
     });
   }
 
+  @Post('import')
+  @UseGuards(RateLimitGuard)
+  @RequirePermissions('inventory.write')
+  @RateLimit({ maxRequests: 10, windowMs: 60_000 })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Import multiple inventory items and return per-item results' })
+  @ApiOkResponse({ description: 'Inventory import completed with per-item results.' })
+  @ApiBadRequestResponse({ description: 'Import request validation failed.' })
+  @ApiForbiddenResponse({ description: 'Caller lacks inventory.write permission.' })
+  @ApiTooManyRequestsResponse({ description: 'Inventory import rate limit exceeded.' })
+  importBatch(
+    @Body() body: unknown,
+    @Req() req: AuthenticatedRequest,
+  ): Observable<InventoryImportResponse> {
+    const parsed = InventoryImportRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.format());
+    return this.inventoryService.importItemsBatch(parsed.data, req.user, this.requestContext(req));
+  }
+
   @Get('anomalies')
   @RequirePermissions('inventory.read')
   @ApiOperation({ summary: 'List computed tenant-scoped inventory anomalies' })
   @ApiQuery({ name: 'type', required: false, enum: InventoryAnomalyTypeSchema.options })
   @ApiQuery({ name: 'severity', required: false, enum: InventoryAnomalySeveritySchema.options })
+  @ApiQuery({ name: 'detectedFrom', required: false, type: String, description: 'Inclusive detection date filter (YYYY-MM-DD).' })
+  @ApiQuery({ name: 'detectedTo', required: false, type: String, description: 'Inclusive detection date filter (YYYY-MM-DD).' })
   @ApiOkResponse({ description: 'Open inventory anomalies.' })
+  @ApiBadRequestResponse({ description: 'Invalid anomaly filter.' })
   anomalies(
     @Req() req: AuthenticatedRequest,
     @Query('type') type?: string,
     @Query('severity') severity?: string,
+    @Query('detectedFrom') detectedFrom?: string,
+    @Query('detectedTo') detectedTo?: string,
   ): Observable<InventoryAnomalyListResponse> {
-    const parsedType = type ? InventoryAnomalyTypeSchema.safeParse(type) : undefined;
-    const parsedSeverity = severity ? InventoryAnomalySeveritySchema.safeParse(severity) : undefined;
-    if (parsedType && !parsedType.success) throw new BadRequestException('Invalid anomaly type');
-    if (parsedSeverity && !parsedSeverity.success) throw new BadRequestException('Invalid anomaly severity');
+    const parsed = InventoryAnomalyListRequestSchema.safeParse({
+      ...(type ? { type } : {}),
+      ...(severity ? { severity } : {}),
+      ...(detectedFrom ? { detectedFrom } : {}),
+      ...(detectedTo ? { detectedTo } : {}),
+    });
+    if (!parsed.success) throw new BadRequestException(parsed.error.format());
     return this.inventoryService.listAnomalies(req.tenantId, {
-      type: parsedType?.data,
-      severity: parsedSeverity?.data,
+      type: parsed.data.type,
+      severity: parsed.data.severity,
+      detectedFrom: parsed.data.detectedFrom,
+      detectedTo: parsed.data.detectedTo,
     });
   }
 
@@ -219,12 +256,17 @@ export class InventoryController {
   @RequirePermissions('inventory.read')
   @ApiOperation({ summary: 'Get one tenant-scoped inventory item by ID' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
+  @ApiQuery({ name: 'includeProvenance', required: false, type: Boolean, description: 'Return the item with its provenance timeline when true.' })
   @ApiOkResponse({ schema: { example: InventoryItemExample } })
   @ApiForbiddenResponse({ description: 'Caller lacks inventory.read permission.' })
   getById(
     @Param('id') id: string,
+    @Query('includeProvenance') includeProvenance: string | undefined,
     @Req() req: AuthenticatedRequest,
-  ): Observable<InventoryItem> {
+  ): Observable<InventoryItem | InventoryProvenanceResponse> {
+    if (includeProvenance === 'true') {
+      return this.inventoryService.getItemWithProvenance(id, req.tenantId);
+    }
     return this.inventoryService.getItem(id, req.tenantId);
   }
 
@@ -259,6 +301,16 @@ export class InventoryController {
     return this.inventoryService.releaseReservation(id, req.tenantId, parsed.data, req.user, this.requestContext(req));
   }
 
+  @Post('reservations/release-expired')
+  @RequirePermissions('inventory.write')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Release expired inventory reservations and record provenance' })
+  @ApiOkResponse({ description: 'Expired reservations released.' })
+  @ApiForbiddenResponse({ description: 'Caller lacks inventory.write permission.' })
+  releaseExpiredReservations(@Req() req: AuthenticatedRequest): Observable<InventoryExpiredReservationReleaseResponse> {
+    return this.inventoryService.releaseExpiredReservations(req.tenantId, req.user, this.requestContext(req));
+  }
+
   @Patch(':id/move')
   @RequirePermissions('inventory.write')
   @ApiOperation({ summary: 'Move inventory to a new location and record provenance' })
@@ -273,6 +325,53 @@ export class InventoryController {
     const parsed = InventoryMoveRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.format());
     return this.inventoryService.moveItem(id, req.tenantId, parsed.data, req.user, this.requestContext(req));
+  }
+
+  @Post('move/batch')
+  @RequirePermissions('inventory.write')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Move multiple inventory items and return per-item results' })
+  @ApiOkResponse({ description: 'Bulk inventory movement completed with per-item results.' })
+  @ApiBadRequestResponse({ description: 'Bulk move request validation failed.' })
+  bulkMove(
+    @Body() body: unknown,
+    @Req() req: AuthenticatedRequest,
+  ): Observable<InventoryBulkMoveResponse> {
+    const parsed = InventoryBulkMoveRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.format());
+    return this.inventoryService.moveItemsBatch(req.tenantId, parsed.data, req.user, this.requestContext(req));
+  }
+
+  @Patch(':id/quantity')
+  @RequirePermissions('inventory.write')
+  @ApiOperation({ summary: 'Adjust inventory quantity and record provenance' })
+  @ApiOkResponse({ description: 'Inventory quantity adjusted.' })
+  @ApiBadRequestResponse({ description: 'Quantity adjustment request validation failed.' })
+  @ApiConflictResponse({ description: 'Inventory quantity cannot be adjusted.' })
+  adjustQuantity(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() req: AuthenticatedRequest,
+  ): Observable<InventoryItem> {
+    const parsed = InventoryQuantityAdjustmentRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.format());
+    return this.inventoryService.adjustQuantity(id, req.tenantId, parsed.data, req.user, this.requestContext(req));
+  }
+
+  @Patch(':id/status')
+  @RequirePermissions('inventory.write')
+  @ApiOperation({ summary: 'Change active inventory status and record provenance' })
+  @ApiOkResponse({ description: 'Inventory status changed.' })
+  @ApiBadRequestResponse({ description: 'Status change request validation failed.' })
+  @ApiConflictResponse({ description: 'Inventory status cannot be changed through this endpoint.' })
+  changeStatus(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() req: AuthenticatedRequest,
+  ): Observable<InventoryItem> {
+    const parsed = InventoryStatusChangeRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.format());
+    return this.inventoryService.changeStatus(id, req.tenantId, parsed.data, req.user, this.requestContext(req));
   }
 
   @Delete(':id')

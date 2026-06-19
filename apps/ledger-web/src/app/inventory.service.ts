@@ -8,21 +8,33 @@ import {
   InventoryAlertSeverity,
   InventoryAlertType,
   InventoryAnomalyListResponse,
+  InventoryAnomalyListRequest,
   InventoryAnomalyListResponseSchema,
-  InventoryAnomalySeverity,
-  InventoryAnomalyType,
+  InventoryBulkMoveRequest,
+  InventoryBulkMoveResponse,
+  InventoryBulkMoveResponseSchema,
+  InventoryExpiredReservationReleaseResponse,
+  InventoryExpiredReservationReleaseResponseSchema,
+  InventoryImportRequest,
+  InventoryImportResponse,
+  InventoryImportResponseSchema,
+  InventoryBatchScanRequest,
+  InventoryBatchScanResponse,
+  InventoryBatchScanResponseSchema,
   InventoryItem,
   InventoryItemSchema,
   InventoryListRequest,
   InventoryListResponse,
   InventoryListResponseSchema,
   InventoryMoveRequest,
+  InventoryQuantityAdjustmentRequest,
   InventoryProvenanceResponse,
   InventoryProvenanceResponseSchema,
   InventoryReservationReleaseRequest,
   InventoryReservationRequest,
   InventoryRemovalRequest,
   InventoryScanRequest,
+  InventoryStatusChangeRequest,
 } from '@true-north-ledger/inventory-contracts';
 import { AuthService } from './auth.service';
 
@@ -57,12 +69,33 @@ export class InventoryService {
       );
   }
 
+  importInventory(request: InventoryImportRequest): Observable<InventoryImportResponse> {
+    return this.http
+      .post<unknown>('/api/v1/inventory/import', request, { headers: this.authService.authHeaders() })
+      .pipe(
+        map((raw) => InventoryImportResponseSchema.parse(raw)),
+        catchError((error) => throwError(() => this.toError(error, 'Failed to import inventory'))),
+      );
+  }
+
   getInventoryItem(id: string): Observable<InventoryItem> {
     return this.http
       .get<unknown>(`/api/v1/inventory/${id}`, { headers: this.authService.authHeaders() })
       .pipe(
         map((raw) => InventoryItemSchema.parse(raw)),
         catchError((error) => throwError(() => this.toError(error, 'Failed to fetch inventory item'))),
+      );
+  }
+
+  getInventoryItemWithProvenance(id: string): Observable<InventoryProvenanceResponse> {
+    return this.http
+      .get<unknown>(`/api/v1/inventory/${id}`, {
+        headers: this.authService.authHeaders(),
+        params: new HttpParams().set('includeProvenance', 'true'),
+      })
+      .pipe(
+        map((raw) => InventoryProvenanceResponseSchema.parse(raw)),
+        catchError((error) => throwError(() => this.toError(error, 'Failed to fetch inventory item provenance'))),
       );
   }
 
@@ -95,12 +128,48 @@ export class InventoryService {
       );
   }
 
+  releaseExpiredReservations(): Observable<InventoryExpiredReservationReleaseResponse> {
+    return this.http
+      .post<unknown>('/api/v1/inventory/reservations/release-expired', {}, { headers: this.authService.authHeaders() })
+      .pipe(
+        map((raw) => InventoryExpiredReservationReleaseResponseSchema.parse(raw)),
+        catchError((error) => throwError(() => this.toError(error, 'Failed to release expired reservations'))),
+      );
+  }
+
   moveInventory(id: string, request: InventoryMoveRequest): Observable<InventoryItem> {
     return this.http
       .patch<unknown>(`/api/v1/inventory/${id}/move`, request, { headers: this.authService.authHeaders() })
       .pipe(
         map((raw) => InventoryItemSchema.parse(raw)),
         catchError((error) => throwError(() => this.toError(error, 'Failed to move inventory'))),
+      );
+  }
+
+  moveInventoryBatch(request: InventoryBulkMoveRequest): Observable<InventoryBulkMoveResponse> {
+    return this.http
+      .post<unknown>('/api/v1/inventory/move/batch', request, { headers: this.authService.authHeaders() })
+      .pipe(
+        map((raw) => InventoryBulkMoveResponseSchema.parse(raw)),
+        catchError((error) => throwError(() => this.toError(error, 'Failed to bulk move inventory'))),
+      );
+  }
+
+  adjustInventoryQuantity(id: string, request: InventoryQuantityAdjustmentRequest): Observable<InventoryItem> {
+    return this.http
+      .patch<unknown>(`/api/v1/inventory/${id}/quantity`, request, { headers: this.authService.authHeaders() })
+      .pipe(
+        map((raw) => InventoryItemSchema.parse(raw)),
+        catchError((error) => throwError(() => this.toError(error, 'Failed to adjust inventory quantity'))),
+      );
+  }
+
+  changeInventoryStatus(id: string, request: InventoryStatusChangeRequest): Observable<InventoryItem> {
+    return this.http
+      .patch<unknown>(`/api/v1/inventory/${id}/status`, request, { headers: this.authService.authHeaders() })
+      .pipe(
+        map((raw) => InventoryItemSchema.parse(raw)),
+        catchError((error) => throwError(() => this.toError(error, 'Failed to change inventory status'))),
       );
   }
 
@@ -122,6 +191,15 @@ export class InventoryService {
       );
   }
 
+  scanInventoryBatch(request: InventoryBatchScanRequest): Observable<InventoryBatchScanResponse> {
+    return this.http
+      .post<unknown>('/api/v1/inventory/scan/batch', request, { headers: this.authService.authHeaders() })
+      .pipe(
+        map((raw) => InventoryBatchScanResponseSchema.parse(raw)),
+        catchError((error) => throwError(() => this.toError(error, 'Inventory batch scan rejected'))),
+      );
+  }
+
   getProvenance(id: string): Observable<InventoryProvenanceResponse> {
     return this.http
       .get<unknown>(`/api/v1/inventory/${id}/provenance`, { headers: this.authService.authHeaders() })
@@ -131,10 +209,12 @@ export class InventoryService {
       );
   }
 
-  getAnomalies(filters: { type?: InventoryAnomalyType; severity?: InventoryAnomalySeverity } = {}): Observable<InventoryAnomalyListResponse> {
+  getAnomalies(filters: InventoryAnomalyListRequest = {}): Observable<InventoryAnomalyListResponse> {
     let params = new HttpParams();
     if (filters.type) params = params.set('type', filters.type);
     if (filters.severity) params = params.set('severity', filters.severity);
+    if (filters.detectedFrom) params = params.set('detectedFrom', filters.detectedFrom);
+    if (filters.detectedTo) params = params.set('detectedTo', filters.detectedTo);
     return this.http
       .get<unknown>('/api/v1/inventory/anomalies', { headers: this.authService.authHeaders(), params })
       .pipe(

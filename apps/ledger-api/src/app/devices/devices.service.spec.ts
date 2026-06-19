@@ -2,6 +2,7 @@ import { of } from 'rxjs';
 import { DevicesService } from './devices.service';
 import { DeviceEntity } from './device.entity';
 import type { LedgerEventsService } from '../ledger-events/ledger-events.service';
+import type { InventoryService } from '../inventory/inventory.service';
 
 const tenantId = '00000000-0000-0000-0000-000000000000';
 const now = new Date('2026-06-04T12:00:00.000Z');
@@ -43,6 +44,7 @@ describe('DevicesService', () => {
     save: jest.Mock;
   };
   let ledgerEventsService: Pick<LedgerEventsService, 'appendEvent'>;
+  let inventoryService: Pick<InventoryService, 'scanItem'>;
 
   beforeEach(() => {
     savedDevices = [];
@@ -76,8 +78,16 @@ describe('DevicesService', () => {
         }),
       ),
     } as unknown as Pick<LedgerEventsService, 'appendEvent'>;
+    inventoryService = {
+      scanItem: jest.fn(() => of({ id: 'inventory-1' })),
+    } as unknown as Pick<InventoryService, 'scanItem'>;
 
-    service = new DevicesService(repository as never, nonceRepository as never, ledgerEventsService as LedgerEventsService);
+    service = new DevicesService(
+      repository as never,
+      nonceRepository as never,
+      ledgerEventsService as LedgerEventsService,
+      inventoryService as InventoryService,
+    );
   });
 
   it('lists devices with filters and pagination metadata', (done) => {
@@ -373,6 +383,40 @@ describe('DevicesService', () => {
             tenantId,
             {},
             undefined,
+          );
+          done();
+        },
+        error: done,
+      });
+  });
+
+  it('tracks inventory scans from scanner device events', (done) => {
+    const entity = buildDevice();
+    const actor = {
+      userId: entity.id,
+      actorType: 'device' as const,
+      tenantId,
+      permissions: entity.permissions,
+      deviceId: entity.id,
+      deviceType: entity.type,
+    };
+
+    service
+      .ingestDeviceEvent(
+        actor,
+        {
+          eventType: 'inventory.scan',
+          payload: { sku: 'sku-100', scanType: 'barcode', locationId: 'AUSTIN-A1' },
+          nonce: 'inventory-scan-nonce-1',
+        },
+        { userAgent: 'scanner-integration' },
+      )
+      .subscribe({
+        next: () => {
+          expect(inventoryService.scanItem).toHaveBeenCalledWith(
+            { value: 'sku-100', scanType: 'barcode', locationId: 'AUSTIN-A1', sourceEventType: 'inventory.scan' },
+            actor,
+            { userAgent: 'scanner-integration' },
           );
           done();
         },

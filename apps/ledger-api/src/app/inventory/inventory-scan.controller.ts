@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Post, Req,
 import {
   ApiBadRequestResponse,
   ApiBody,
+  ApiConflictResponse,
   ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -11,6 +12,8 @@ import {
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import {
+  InventoryBatchScanRequestSchema,
+  InventoryBatchScanResponse,
   InventoryItem,
   InventoryScanRequestSchema,
   InventoryScanTypeSchema,
@@ -37,6 +40,21 @@ interface ScanAuthenticatedRequest {
 export class InventoryScanController {
   constructor(private readonly inventoryService: InventoryService) {}
 
+  @Post('scan/batch')
+  @UseGuards(InventoryScanAuthGuard, RateLimitGuard)
+  @RateLimit({ maxRequests: 30, windowMs: 60_000 })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Scan up to 100 tenant inventory items and return per-item results' })
+  @ApiHeader({ name: 'X-Device-Key', required: false, description: 'Device API key; bearer auth may also be used.' })
+  @ApiOkResponse({ description: 'Batch inventory scan completed with per-item results.' })
+  @ApiBadRequestResponse({ description: 'Invalid batch scan payload.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token or device key.' })
+  scanBatch(@Body() body: unknown, @Req() req: ScanAuthenticatedRequest): Observable<InventoryBatchScanResponse> {
+    const parsed = InventoryBatchScanRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.format());
+    return this.inventoryService.scanItemsBatch(parsed.data, req.user, this.requestContext(req));
+  }
+
   @Post('scan')
   @UseGuards(InventoryScanAuthGuard, RateLimitGuard)
   @RateLimit({ maxRequests: 120, windowMs: 60_000 })
@@ -56,15 +74,20 @@ export class InventoryScanController {
   })
   @ApiOkResponse({ description: 'Inventory scan accepted and item details returned.' })
   @ApiBadRequestResponse({ description: 'Invalid scan payload.' })
+  @ApiConflictResponse({ description: 'Scan location does not match the inventory item location.' })
   @ApiNotFoundResponse({ description: 'No tenant inventory matches the SKU or serial number.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token or device key.' })
   scan(@Body() body: unknown, @Req() req: ScanAuthenticatedRequest): Observable<InventoryItem> {
     const parsed = InventoryScanRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.format());
-    return this.inventoryService.scanItem(parsed.data, req.user, {
+    return this.inventoryService.scanItem(parsed.data, req.user, this.requestContext(req));
+  }
+
+  private requestContext(req: ScanAuthenticatedRequest) {
+    return {
       sourceIp: req.ip,
       userAgent: req.headers['user-agent'],
       correlationId: req.headers['x-correlation-id'],
-    });
+    };
   }
 }

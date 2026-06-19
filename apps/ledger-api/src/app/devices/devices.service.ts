@@ -3,8 +3,10 @@ import {
   ForbiddenException,
   ConflictException,
   Injectable,
+  Inject,
   NotFoundException,
   UnauthorizedException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes, randomUUID } from 'crypto';
@@ -34,6 +36,8 @@ import {
   LedgerEventsService,
   LedgerRequestContext,
 } from '../ledger-events/ledger-events.service';
+import { InventoryScanRequestSchema } from '@true-north-ledger/inventory-contracts';
+import { InventoryService } from '../inventory/inventory.service';
 import { DeviceEntity } from './device.entity';
 import { DeviceNonceEntity } from './device-nonce.entity';
 
@@ -71,6 +75,8 @@ export class DevicesService {
     @InjectRepository(DeviceNonceEntity)
     private readonly nonceRepository: Repository<DeviceNonceEntity>,
     private readonly ledgerEventsService: LedgerEventsService,
+    @Inject(forwardRef(() => InventoryService))
+    private readonly inventoryService: InventoryService,
   ) {}
 
   registerDevice(
@@ -431,11 +437,49 @@ export class DevicesService {
       ),
     );
 
+    if (request.eventType.trim().toLowerCase() === 'inventory.scan') {
+      await this.trackInventoryScanFromDeviceEvent(actor, request, requestContext);
+    }
+
     return {
       eventId: event.id,
       serverTimestamp: event.metadata.timestamp,
       nonce: request.nonce,
     };
+  }
+
+  private async trackInventoryScanFromDeviceEvent(
+    actor: DeviceActor,
+    request: DeviceEventRequest,
+    requestContext: LedgerRequestContext,
+  ): Promise<void> {
+    const payload = request.payload;
+    const value = this.stringPayloadValue(payload, 'value')
+      ?? this.stringPayloadValue(payload, 'sku')
+      ?? this.stringPayloadValue(payload, 'serialNumber')
+      ?? this.stringPayloadValue(payload, 'barcode');
+    const scanType = this.stringPayloadValue(payload, 'scanType')
+      ?? (this.stringPayloadValue(payload, 'barcode') ? 'barcode' : 'manual');
+    const locationId = this.stringPayloadValue(payload, 'locationId');
+    const parsed = InventoryScanRequestSchema.safeParse({
+      value,
+      scanType,
+      ...(locationId ? { locationId } : {}),
+      sourceEventType: request.eventType,
+    });
+
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.format());
+    }
+
+    await this.resolveObservable(
+      this.inventoryService.scanItem(parsed.data, actor, requestContext),
+    );
+  }
+
+  private stringPayloadValue(payload: Record<string, unknown>, key: string): string | undefined {
+    const value = payload[key];
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
   }
 
   private async recordDeviceEventsBatch(

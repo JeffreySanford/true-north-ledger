@@ -45,6 +45,7 @@ export const CreateInventoryItemRequestSchema = z.object({
 export const InventoryReservationRequestSchema = z.object({
   quantity: z.number().int().positive(),
   orderId: z.string().uuid().optional(),
+  timeoutMinutes: z.number().int().positive().max(10_080).optional(),
 });
 
 export const InventoryReservationReleaseRequestSchema = z.object({
@@ -57,6 +58,37 @@ export const InventoryMoveRequestSchema = z.object({
   reason: z.string().trim().min(1).max(500).optional(),
 });
 
+export const InventoryBulkMoveRequestSchema = InventoryMoveRequestSchema.extend({
+  itemIds: z.array(z.string().uuid()).min(1).max(100),
+});
+
+export const InventoryImportRequestSchema = z.object({
+  items: z.array(CreateInventoryItemRequestSchema).min(1).max(100),
+});
+
+export const InventoryQuantityAdjustmentRequestSchema = z.object({
+  quantity: z.number().int().nonnegative(),
+  reason: z.string().trim().min(1).max(500),
+});
+
+export const InventoryStatusChangeRequestSchema = z.object({
+  status: InventoryStatusSchema,
+  reason: z.string().trim().min(1).max(500),
+});
+
+export const InventoryOperationTypeSchema = z.enum([
+  'add',
+  'reserve',
+  'release_reservation',
+  'move',
+  'remove',
+  'scan',
+  'adjust_quantity',
+  'change_status',
+  'detect_anomaly',
+  'generate_alert',
+]);
+
 export const InventoryRemovalRequestSchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
@@ -67,6 +99,11 @@ export const InventoryScanRequestSchema = z.object({
   value: z.string().trim().min(1).max(160),
   scanType: InventoryScanTypeSchema,
   locationId: z.string().trim().min(1).max(120).optional(),
+  sourceEventType: z.string().trim().min(1).max(100).optional(),
+});
+
+export const InventoryBatchScanRequestSchema = z.object({
+  scans: z.array(InventoryScanRequestSchema).min(1).max(100),
 });
 
 export const InventoryItemSchema = z.object({
@@ -91,6 +128,47 @@ export const InventoryItemSchema = z.object({
   lastScannedAt: z.string().datetime().nullable(),
   removalReason: z.string().nullable(),
   removedAt: z.string().datetime().nullable(),
+});
+
+export const InventoryBatchScanResultSchema = z.object({
+  index: z.number().int().nonnegative(),
+  value: z.string().min(1),
+  success: z.boolean(),
+  item: InventoryItemSchema.optional(),
+  error: z.string().min(1).optional(),
+});
+
+export const InventoryBatchScanResponseSchema = z.object({
+  results: z.array(InventoryBatchScanResultSchema),
+});
+
+export const InventoryBulkMoveResultSchema = z.object({
+  index: z.number().int().nonnegative(),
+  itemId: z.string().uuid(),
+  success: z.boolean(),
+  item: InventoryItemSchema.optional(),
+  error: z.string().min(1).optional(),
+});
+
+export const InventoryBulkMoveResponseSchema = z.object({
+  results: z.array(InventoryBulkMoveResultSchema),
+});
+
+export const InventoryExpiredReservationReleaseResponseSchema = z.object({
+  released: z.array(InventoryItemSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export const InventoryImportResultSchema = z.object({
+  index: z.number().int().nonnegative(),
+  sku: z.string().min(1),
+  success: z.boolean(),
+  item: InventoryItemSchema.optional(),
+  error: z.string().min(1).optional(),
+});
+
+export const InventoryImportResponseSchema = z.object({
+  results: z.array(InventoryImportResultSchema),
 });
 
 export const InventoryListRequestSchema = z.object({
@@ -130,6 +208,8 @@ export const InventoryProvenanceEventSchema = z.object({
 export const InventoryProvenanceResponseSchema = z.object({
   item: InventoryItemSchema,
   events: z.array(InventoryProvenanceEventSchema),
+  reservationHistory: z.array(InventoryProvenanceEventSchema),
+  scanHistory: z.array(InventoryProvenanceEventSchema),
 });
 
 export const InventoryAnomalyTypeSchema = z.enum([
@@ -137,6 +217,8 @@ export const InventoryAnomalyTypeSchema = z.enum([
   'missing_scan',
   'expired',
   'damaged_not_removed',
+  'unexpected_location',
+  'quantity_discrepancy',
 ]);
 export const InventoryAnomalySeveritySchema = z.enum(['warning', 'error', 'critical']);
 export const InventoryAnomalyStatusSchema = z.enum(['open', 'resolved']);
@@ -160,6 +242,19 @@ export const InventoryAnomalySchema = z.object({
 export const InventoryAnomalyListResponseSchema = z.object({
   anomalies: z.array(InventoryAnomalySchema),
   total: z.number().int().nonnegative(),
+});
+
+export const InventoryAnomalyListRequestSchema = z.object({
+  type: InventoryAnomalyTypeSchema.optional(),
+  severity: InventoryAnomalySeveritySchema.optional(),
+  detectedFrom: z.string().date().optional(),
+  detectedTo: z.string().date().optional(),
+}).refine((request) => {
+  if (!request.detectedFrom || !request.detectedTo) return true;
+  return request.detectedFrom <= request.detectedTo;
+}, {
+  message: 'detectedFrom must be on or before detectedTo',
+  path: ['detectedFrom'],
 });
 
 export const InventoryAlertTypeSchema = z.enum([
@@ -235,10 +330,23 @@ export type CreateInventoryItemRequest = z.infer<typeof CreateInventoryItemReque
 export type InventoryReservationRequest = z.infer<typeof InventoryReservationRequestSchema>;
 export type InventoryReservationReleaseRequest = z.infer<typeof InventoryReservationReleaseRequestSchema>;
 export type InventoryMoveRequest = z.infer<typeof InventoryMoveRequestSchema>;
+export type InventoryBulkMoveRequest = z.infer<typeof InventoryBulkMoveRequestSchema>;
+export type InventoryImportRequest = z.infer<typeof InventoryImportRequestSchema>;
+export type InventoryQuantityAdjustmentRequest = z.infer<typeof InventoryQuantityAdjustmentRequestSchema>;
+export type InventoryStatusChangeRequest = z.infer<typeof InventoryStatusChangeRequestSchema>;
+export type InventoryOperationType = z.infer<typeof InventoryOperationTypeSchema>;
 export type InventoryRemovalRequest = z.infer<typeof InventoryRemovalRequestSchema>;
 export type InventoryScanType = z.infer<typeof InventoryScanTypeSchema>;
 export type InventoryScanRequest = z.infer<typeof InventoryScanRequestSchema>;
+export type InventoryBatchScanRequest = z.infer<typeof InventoryBatchScanRequestSchema>;
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+export type InventoryBatchScanResult = z.infer<typeof InventoryBatchScanResultSchema>;
+export type InventoryBatchScanResponse = z.infer<typeof InventoryBatchScanResponseSchema>;
+export type InventoryBulkMoveResult = z.infer<typeof InventoryBulkMoveResultSchema>;
+export type InventoryBulkMoveResponse = z.infer<typeof InventoryBulkMoveResponseSchema>;
+export type InventoryExpiredReservationReleaseResponse = z.infer<typeof InventoryExpiredReservationReleaseResponseSchema>;
+export type InventoryImportResult = z.infer<typeof InventoryImportResultSchema>;
+export type InventoryImportResponse = z.infer<typeof InventoryImportResponseSchema>;
 export type InventoryListRequest = z.infer<typeof InventoryListRequestSchema>;
 export type InventoryListResponse = z.infer<typeof InventoryListResponseSchema>;
 export type InventoryProvenanceEvent = z.infer<typeof InventoryProvenanceEventSchema>;
@@ -247,6 +355,7 @@ export type InventoryAnomalyType = z.infer<typeof InventoryAnomalyTypeSchema>;
 export type InventoryAnomalySeverity = z.infer<typeof InventoryAnomalySeveritySchema>;
 export type InventoryAnomalyStatus = z.infer<typeof InventoryAnomalyStatusSchema>;
 export type InventoryAnomaly = z.infer<typeof InventoryAnomalySchema>;
+export type InventoryAnomalyListRequest = z.infer<typeof InventoryAnomalyListRequestSchema>;
 export type InventoryAnomalyListResponse = z.infer<typeof InventoryAnomalyListResponseSchema>;
 export type InventoryAlertType = z.infer<typeof InventoryAlertTypeSchema>;
 export type InventoryAlertSeverity = z.infer<typeof InventoryAlertSeveritySchema>;

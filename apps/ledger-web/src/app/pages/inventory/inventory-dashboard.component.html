@@ -1,0 +1,91 @@
+<section class="inventory-dashboard" data-testid="inventory-dashboard" aria-label="Inventory dashboard">
+  <div class="dashboard-header">
+    <div>
+      <h2>Inventory dashboard</h2>
+      <p>{{ total }} total tenant items tracked across {{ locationMetrics.length }} active locations.</p>
+    </div>
+    <div class="dashboard-actions">
+      <button type="button" data-testid="dashboard-refresh" (click)="refreshInventory.emit()" [disabled]="loading">Refresh status</button>
+      <button type="button" data-testid="dashboard-alerts" (click)="generateAlerts.emit()" [disabled]="alertLoading">Generate alerts</button>
+      <button type="button" data-testid="dashboard-anomalies" (click)="detectAnomalies.emit()" [disabled]="anomalyLoading">Detect anomalies</button>
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <article class="dashboard-card" data-testid="dashboard-status">
+      <h3>Status</h3>
+      <div class="metric-grid">
+        @for (metric of statusMetrics; track metric.label) {
+          <span class="metric-pill" [class.metric-watch]="metric.state === 'watch'" [class.metric-risk]="metric.state === 'risk'">
+            <strong>{{ metric.value }}</strong>{{ metric.label }}
+          </span>
+        }
+      </div>
+    </article>
+
+    <article class="dashboard-card" data-testid="dashboard-health">
+      <h3>Health</h3>
+      <div class="metric-grid">
+        @for (metric of healthMetrics; track metric.label) {
+          <span class="metric-pill" [class.metric-watch]="metric.state === 'watch'" [class.metric-risk]="metric.state === 'risk'">
+            <strong>{{ metric.value }}</strong>{{ metric.label }}
+          </span>
+        }
+      </div>
+    </article>
+
+    <article class="dashboard-card" data-testid="dashboard-locations">
+      <h3>Locations</h3>
+      @if (locationMetrics.length === 0) {
+        <tnl-empty-state
+          title="No location inventory loaded"
+          message="Refresh inventory or add stock to populate location totals."
+          icon="info"
+        ></tnl-empty-state>
+      } @else {
+        <ol>
+          @for (metric of locationMetrics; track metric.label) {
+            <li><strong>{{ metric.value }}</strong> {{ metric.label }}</li>
+          }
+        </ol>
+      }
+    </article>
+
+    <article class="dashboard-card" data-testid="dashboard-recent-scans">
+      <h3>Recent scans</h3>
+      @if (recentScans.length === 0 && provenanceScanLabels.length === 0) {
+        <tnl-empty-state
+          title="No recent scans loaded"
+          message="Submit a scan or open provenance to show recent scan activity."
+          icon="info"
+        ></tnl-empty-state>
+      } @else {
+        <ol>
+          @for (item of recentScans; track item.id) {
+            <li>{{ item.sku }} | {{ item.locationName }} | {{ item.lastScannedAt }}</li>
+          }
+          @for (scan of provenanceScanLabels; track scan) {
+            <li>{{ scan }}</li>
+          }
+        </ol>
+      }
+    </article>
+
+    <article class="dashboard-card" data-testid="dashboard-recent-anomalies">
+      <h3>Recent anomalies</h3>
+      @if (recentAnomalies.length === 0) {
+        <tnl-empty-state
+          title="No anomalies loaded"
+          message="Run detection to show low stock, expiration, location, or quantity issues."
+          icon="info"
+        ></tnl-empty-state>
+      } @else {
+        <ol>
+          @for (anomaly of recentAnomalies; track anomaly.id) {
+            <li><strong>{{ anomaly.severity }}</strong> {{ anomaly.sku }} | {{ anomaly.type }}</li>
+          }
+        </ol>
+      }
+    </article>
+  </div>
+</section>

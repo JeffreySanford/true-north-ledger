@@ -10,21 +10,31 @@ import {
   InventoryAlertSeverity,
   InventoryAlertType,
   InventoryAnomaly,
+  InventoryAnomalyListRequest,
   InventoryAnomalyListResponse,
   InventoryAnomalySeverity,
   InventoryAnomalyType,
+  InventoryBulkMoveRequest,
+  InventoryBulkMoveResponse,
+  InventoryExpiredReservationReleaseResponse,
+  InventoryImportRequest,
+  InventoryImportResponse,
+  InventoryBatchScanRequest,
+  InventoryBatchScanResponse,
   InventoryItem,
   InventoryLedgerEventAction,
   InventoryLedgerEventActionSchema,
   InventoryListRequest,
   InventoryListResponse,
   InventoryMoveRequest,
+  InventoryQuantityAdjustmentRequest,
   InventoryProvenanceEvent,
   InventoryProvenanceResponse,
   InventoryReservationReleaseRequest,
   InventoryReservationRequest,
   InventoryRemovalRequest,
   InventoryScanRequest,
+  InventoryStatusChangeRequest,
 } from '@true-north-ledger/inventory-contracts';
 import {
   AuthenticatedLedgerActor,
@@ -71,6 +81,10 @@ export class InventoryService {
     );
   }
 
+  getItemWithProvenance(id: string, tenantId: string): Observable<InventoryProvenanceResponse> {
+    return from(this.buildProvenance(id, tenantId));
+  }
+
   getItemBySku(sku: string, tenantId: string): Observable<InventoryItem> {
     return from(this.findTenantItemBySku(sku, tenantId)).pipe(
       map((entity) => this.toInventoryItem(entity)),
@@ -101,6 +115,14 @@ export class InventoryService {
     );
   }
 
+  releaseExpiredReservations(
+    tenantId: string,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext = {},
+  ): Observable<InventoryExpiredReservationReleaseResponse> {
+    return from(this.persistExpiredReservationRelease(tenantId, actor, requestContext));
+  }
+
   moveItem(
     id: string,
     tenantId: string,
@@ -109,6 +131,47 @@ export class InventoryService {
     requestContext: LedgerRequestContext = {},
   ): Observable<InventoryItem> {
     return from(this.persistMove(id, tenantId, request, actor, requestContext)).pipe(
+      map((entity) => this.toInventoryItem(entity)),
+    );
+  }
+
+  moveItemsBatch(
+    tenantId: string,
+    request: InventoryBulkMoveRequest,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext = {},
+  ): Observable<InventoryBulkMoveResponse> {
+    return from(this.persistBulkMove(tenantId, request, actor, requestContext));
+  }
+
+  importItemsBatch(
+    request: InventoryImportRequest,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext = {},
+  ): Observable<InventoryImportResponse> {
+    return from(this.persistImport(request, actor, requestContext));
+  }
+
+  adjustQuantity(
+    id: string,
+    tenantId: string,
+    request: InventoryQuantityAdjustmentRequest,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext = {},
+  ): Observable<InventoryItem> {
+    return from(this.persistQuantityAdjustment(id, tenantId, request, actor, requestContext)).pipe(
+      map((entity) => this.toInventoryItem(entity)),
+    );
+  }
+
+  changeStatus(
+    id: string,
+    tenantId: string,
+    request: InventoryStatusChangeRequest,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext = {},
+  ): Observable<InventoryItem> {
+    return from(this.persistStatusChange(id, tenantId, request, actor, requestContext)).pipe(
       map((entity) => this.toInventoryItem(entity)),
     );
   }
@@ -135,13 +198,21 @@ export class InventoryService {
     );
   }
 
+  scanItemsBatch(
+    request: InventoryBatchScanRequest,
+    actor: AuthenticatedLedgerActor & { deviceId?: string; deviceType?: string },
+    requestContext: LedgerRequestContext = {},
+  ): Observable<InventoryBatchScanResponse> {
+    return from(this.persistScanBatch(request, actor, requestContext));
+  }
+
   getProvenance(id: string, tenantId: string): Observable<InventoryProvenanceResponse> {
     return from(this.buildProvenance(id, tenantId));
   }
 
   listAnomalies(
     tenantId: string,
-    filters: { type?: InventoryAnomalyType; severity?: InventoryAnomalySeverity } = {},
+    filters: InventoryAnomalyListRequest = {},
   ): Observable<InventoryAnomalyListResponse> {
     return from(this.buildAnomalies(tenantId, filters));
   }
@@ -229,6 +300,33 @@ export class InventoryService {
     return saved;
   }
 
+  private async persistImport(
+    request: InventoryImportRequest,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext,
+  ): Promise<InventoryImportResponse> {
+    const results: InventoryImportResponse['results'] = [];
+    for (const [index, itemRequest] of request.items.entries()) {
+      try {
+        const entity = await this.persistItem(itemRequest, actor, requestContext);
+        results.push({
+          index,
+          sku: itemRequest.sku,
+          success: true,
+          item: this.toInventoryItem(entity),
+        });
+      } catch (error) {
+        results.push({
+          index,
+          sku: itemRequest.sku,
+          success: false,
+          error: error instanceof Error ? error.message : 'Inventory import failed',
+        });
+      }
+    }
+    return { results };
+  }
+
   private async persistReservation(
     id: string,
     tenantId: string,
@@ -251,13 +349,24 @@ export class InventoryService {
     entity.reservedQuantity = request.quantity;
     entity.reservationOrderId = request.orderId ?? null;
     entity.status = 'reserved';
+    entity.metadata = {
+      ...entity.metadata,
+      ...(request.timeoutMinutes
+        ? { reservationExpiresAt: new Date(Date.now() + request.timeoutMinutes * 60_000).toISOString() }
+        : {}),
+    };
     const saved = await this.inventoryRepository.save(entity);
     await this.appendInventoryEvent(
       saved,
       InventoryLedgerEventAction.INVENTORY_RESERVED,
       actor,
       requestContext,
-      { reservedQuantity: request.quantity, orderId: request.orderId ?? null },
+      {
+        reservedQuantity: request.quantity,
+        orderId: request.orderId ?? null,
+        timeoutMinutes: request.timeoutMinutes ?? null,
+        reservationExpiresAt: saved.metadata['reservationExpiresAt'] ?? null,
+      },
     );
     return saved;
   }
@@ -279,6 +388,9 @@ export class InventoryService {
     entity.reservedQuantity = 0;
     entity.reservationOrderId = null;
     entity.status = 'available';
+    const metadata = { ...entity.metadata };
+    delete metadata['reservationExpiresAt'];
+    entity.metadata = metadata;
     const saved = await this.inventoryRepository.save(entity);
     await this.appendInventoryEvent(
       saved,
@@ -288,6 +400,44 @@ export class InventoryService {
       { releasedQuantity, orderId, reason: request.reason },
     );
     return saved;
+  }
+
+  private async persistExpiredReservationRelease(
+    tenantId: string,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext,
+  ): Promise<InventoryExpiredReservationReleaseResponse> {
+    const now = new Date();
+    const reserved = await this.inventoryRepository.find({ where: { tenantId, status: 'reserved' } });
+    const released: InventoryItem[] = [];
+    for (const entity of reserved) {
+      const expiresAt = this.reservationExpiresAt(entity);
+      if (!expiresAt || expiresAt > now || entity.reservedQuantity <= 0) continue;
+      const releasedQuantity = entity.reservedQuantity;
+      const orderId = entity.reservationOrderId ?? null;
+      entity.quantity += releasedQuantity;
+      entity.reservedQuantity = 0;
+      entity.reservationOrderId = null;
+      entity.status = 'available';
+      const metadata = { ...entity.metadata };
+      delete metadata['reservationExpiresAt'];
+      entity.metadata = metadata;
+      const saved = await this.inventoryRepository.save(entity);
+      await this.appendInventoryEvent(
+        saved,
+        InventoryLedgerEventAction.INVENTORY_RESERVATION_RELEASED,
+        actor,
+        requestContext,
+        {
+          releasedQuantity,
+          orderId,
+          reason: 'Reservation timeout expired',
+          reservationExpiredAt: expiresAt.toISOString(),
+        },
+      );
+      released.push(this.toInventoryItem(saved));
+    }
+    return { released, total: released.length };
   }
 
   private async persistMove(
@@ -316,6 +466,113 @@ export class InventoryService {
       {
         fromLocation,
         toLocation: { id: saved.locationId, name: saved.locationName },
+        reason: request.reason,
+      },
+    );
+    return saved;
+  }
+
+  private async persistBulkMove(
+    tenantId: string,
+    request: InventoryBulkMoveRequest,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext,
+  ): Promise<InventoryBulkMoveResponse> {
+    const results: InventoryBulkMoveResponse['results'] = [];
+    for (const [index, itemId] of request.itemIds.entries()) {
+      try {
+        const entity = await this.persistMove(itemId, tenantId, {
+          locationId: request.locationId,
+          locationName: request.locationName,
+          reason: request.reason,
+        }, actor, requestContext);
+        results.push({
+          index,
+          itemId,
+          success: true,
+          item: this.toInventoryItem(entity),
+        });
+      } catch (error) {
+        results.push({
+          index,
+          itemId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Inventory move failed',
+        });
+      }
+    }
+    return { results };
+  }
+
+  private async persistQuantityAdjustment(
+    id: string,
+    tenantId: string,
+    request: InventoryQuantityAdjustmentRequest,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext,
+  ): Promise<InventoryItemEntity> {
+    const entity = await this.findTenantItem(id, tenantId);
+    if (entity.status === 'removed') {
+      throw new ConflictException('Removed inventory quantity cannot be adjusted');
+    }
+    if (request.quantity < entity.reservedQuantity) {
+      throw new BadRequestException('Quantity cannot be less than the active reserved quantity');
+    }
+    if (request.quantity === entity.quantity) {
+      throw new ConflictException('Inventory quantity is already set to the requested value');
+    }
+    const previousQuantity = entity.quantity;
+    entity.quantity = request.quantity;
+    const saved = await this.inventoryRepository.save(entity);
+    await this.appendInventoryEvent(
+      saved,
+      InventoryLedgerEventAction.INVENTORY_QUANTITY_ADJUSTED,
+      actor,
+      requestContext,
+      {
+        previousQuantity,
+        adjustedQuantity: saved.quantity,
+        delta: saved.quantity - previousQuantity,
+        reason: request.reason,
+      },
+    );
+    return saved;
+  }
+
+  private async persistStatusChange(
+    id: string,
+    tenantId: string,
+    request: InventoryStatusChangeRequest,
+    actor: AuthenticatedLedgerActor,
+    requestContext: LedgerRequestContext,
+  ): Promise<InventoryItemEntity> {
+    const entity = await this.findTenantItem(id, tenantId);
+    if (entity.status === 'removed') {
+      throw new ConflictException('Removed inventory status cannot be changed');
+    }
+    if (request.status === 'removed') {
+      throw new ConflictException('Use the inventory removal endpoint to remove inventory');
+    }
+    if (request.status === 'reserved') {
+      throw new ConflictException('Use the reservation endpoint to reserve inventory');
+    }
+    if (entity.reservedQuantity > 0) {
+      throw new ConflictException('Release the active reservation before changing inventory status');
+    }
+    if (entity.status === request.status) {
+      throw new ConflictException('Inventory status is already set to the requested value');
+    }
+    const previousStatus = entity.status;
+    entity.status = request.status;
+    const saved = await this.inventoryRepository.save(entity);
+    await this.appendInventoryEvent(
+      saved,
+      InventoryLedgerEventAction.INVENTORY_STATUS_CHANGED,
+      actor,
+      requestContext,
+      {
+        previousStatus,
+        status: saved.status,
         reason: request.reason,
       },
     );
@@ -369,6 +626,59 @@ export class InventoryService {
     if (!entity) throw new NotFoundException(`Inventory item ${value} not found`);
 
     entity.lastScannedAt = new Date();
+    if (request.locationId && request.locationId !== entity.locationId) {
+      const detectedAt = entity.lastScannedAt.toISOString();
+      entity.metadata = {
+        ...entity.metadata,
+        lastLocationMismatch: {
+          expectedLocationId: entity.locationId,
+          expectedLocationName: entity.locationName,
+          scannedLocationId: request.locationId,
+          detectedAt,
+        },
+      };
+      const mismatched = await this.inventoryRepository.save(entity);
+      await this.appendInventoryEvent(
+        mismatched,
+        InventoryLedgerEventAction.INVENTORY_SCANNED,
+        actor,
+        requestContext,
+        {
+          scanType: request.scanType,
+          scanValue: value,
+          scannedLocationId: request.locationId,
+          accepted: false,
+          rejectionReason: 'unexpected_location',
+          deviceId: actor.deviceId ?? null,
+          deviceType: actor.deviceType ?? null,
+          scannedAt: detectedAt,
+          sourceEventType: request.sourceEventType ?? null,
+        },
+      );
+      await this.appendInventoryEvent(
+        mismatched,
+        InventoryLedgerEventAction.INVENTORY_ANOMALY_DETECTED,
+        actor,
+        requestContext,
+        {
+          anomalyId: `${mismatched.id}:unexpected_location`,
+          anomalyType: 'unexpected_location',
+          severity: 'error',
+          message: `${mismatched.sku} was scanned at ${request.locationId}, expected ${mismatched.locationId}.`,
+          remediation: 'Confirm item location and move inventory if the physical location is correct.',
+          detectedAt,
+          scannedLocationId: request.locationId,
+          expectedLocationId: mismatched.locationId,
+        },
+      );
+      throw new ConflictException(
+        `Inventory item ${value} expected at ${mismatched.locationId}, not ${request.locationId}`,
+      );
+    }
+
+    const metadata = { ...entity.metadata };
+    delete metadata['lastLocationMismatch'];
+    entity.metadata = metadata;
     const saved = await this.inventoryRepository.save(entity);
     await this.appendInventoryEvent(
       saved,
@@ -379,12 +689,41 @@ export class InventoryService {
         scanType: request.scanType,
         scanValue: value,
         scannedLocationId: request.locationId ?? null,
+        accepted: true,
         deviceId: actor.deviceId ?? null,
         deviceType: actor.deviceType ?? null,
         scannedAt: saved.lastScannedAt?.toISOString(),
+        sourceEventType: request.sourceEventType ?? null,
       },
     );
     return saved;
+  }
+
+  private async persistScanBatch(
+    request: InventoryBatchScanRequest,
+    actor: AuthenticatedLedgerActor & { deviceId?: string; deviceType?: string },
+    requestContext: LedgerRequestContext,
+  ): Promise<InventoryBatchScanResponse> {
+    const results: InventoryBatchScanResponse['results'] = [];
+    for (const [index, scan] of request.scans.entries()) {
+      try {
+        const entity = await this.persistScan(scan, actor, requestContext);
+        results.push({
+          index,
+          value: scan.value,
+          success: true,
+          item: this.toInventoryItem(entity),
+        });
+      } catch (error) {
+        results.push({
+          index,
+          value: scan.value,
+          success: false,
+          error: error instanceof Error ? error.message : 'Inventory scan failed',
+        });
+      }
+    }
+    return { results };
   }
 
   private async buildProvenance(id: string, tenantId: string): Promise<InventoryProvenanceResponse> {
@@ -392,21 +731,30 @@ export class InventoryService {
     const events = await this.awaitObservable(
       this.ledgerEventsService.findSubjectEvents(tenantId, 'inventory', id),
     );
+    const provenanceEvents = events.map((event) => this.toProvenanceEvent(event));
     return {
       item: this.toInventoryItem(entity),
-      events: events.map((event) => this.toProvenanceEvent(event)),
+      events: provenanceEvents,
+      reservationHistory: provenanceEvents.filter((event) =>
+        event.action === InventoryLedgerEventAction.INVENTORY_RESERVED
+        || event.action === InventoryLedgerEventAction.INVENTORY_RESERVATION_RELEASED),
+      scanHistory: provenanceEvents.filter((event) => event.action === InventoryLedgerEventAction.INVENTORY_SCANNED),
     };
   }
 
   private async buildAnomalies(
     tenantId: string,
-    filters: { type?: InventoryAnomalyType; severity?: InventoryAnomalySeverity } = {},
+    filters: InventoryAnomalyListRequest = {},
   ): Promise<InventoryAnomalyListResponse> {
     const entities = await this.inventoryRepository.find({ where: { tenantId } });
+    const detectedFrom = filters.detectedFrom ? Date.parse(`${filters.detectedFrom}T00:00:00.000Z`) : null;
+    const detectedTo = filters.detectedTo ? Date.parse(`${filters.detectedTo}T23:59:59.999Z`) : null;
     const anomalies = entities
       .flatMap((entity) => this.detectItemAnomalies(entity))
       .filter((anomaly) => !filters.type || anomaly.type === filters.type)
-      .filter((anomaly) => !filters.severity || anomaly.severity === filters.severity);
+      .filter((anomaly) => !filters.severity || anomaly.severity === filters.severity)
+      .filter((anomaly) => detectedFrom === null || Date.parse(anomaly.detectedAt) >= detectedFrom)
+      .filter((anomaly) => detectedTo === null || Date.parse(anomaly.detectedAt) <= detectedTo);
     return { anomalies, total: anomalies.length };
   }
 
@@ -558,6 +906,43 @@ export class InventoryService {
         'Review and remove damaged inventory when appropriate.',
         { status: entity.status }));
     }
+    const expectedQuantity = entity.metadata?.['expectedQuantity'];
+    if (typeof expectedQuantity === 'number' && Number.isFinite(expectedQuantity) && expectedQuantity !== entity.quantity) {
+      anomalies.push(this.anomaly(entity, 'quantity_discrepancy', 'error',
+        `${entity.sku} has ${entity.quantity} ${entity.unitOfMeasure} recorded; expected ${expectedQuantity}.`,
+        'Reconcile physical count and adjust inventory quantity if the expected count is correct.',
+        {
+          quantity: entity.quantity,
+          expectedQuantity,
+          delta: entity.quantity - expectedQuantity,
+        }));
+    }
+    const locationMismatch = entity.metadata?.['lastLocationMismatch'];
+    if (locationMismatch && typeof locationMismatch === 'object') {
+      const details = locationMismatch as Record<string, unknown>;
+      const scannedLocationId = typeof details['scannedLocationId'] === 'string'
+        ? details['scannedLocationId']
+        : 'unknown location';
+      anomalies.push(this.anomaly(entity, 'unexpected_location', 'error',
+        `${entity.sku} was scanned at ${scannedLocationId}, expected ${entity.locationId}.`,
+        'Confirm item location and move inventory if the physical location is correct.',
+        { ...details, expectedLocationId: entity.locationId }));
+    }
+    const expectedLocationId = entity.metadata?.['expectedLocationId'];
+    if (!locationMismatch && typeof expectedLocationId === 'string' && expectedLocationId !== entity.locationId) {
+      const expectedLocationName = typeof entity.metadata['expectedLocationName'] === 'string'
+        ? entity.metadata['expectedLocationName']
+        : expectedLocationId;
+      anomalies.push(this.anomaly(entity, 'unexpected_location', 'error',
+        `${entity.sku} is recorded at ${entity.locationId}, expected ${expectedLocationId}.`,
+        'Move inventory to the expected location or update the expected location metadata after verification.',
+        {
+          currentLocationId: entity.locationId,
+          currentLocationName: entity.locationName,
+          expectedLocationId,
+          expectedLocationName,
+        }));
+    }
     const scanReference = entity.lastScannedAt ?? entity.createdAt;
     const missingScanDays = Math.floor((Date.now() - scanReference.getTime()) / 86_400_000);
     if (missingScanDays >= 30) {
@@ -633,6 +1018,13 @@ export class InventoryService {
     const entity = await this.inventoryRepository.findOne({ where: { sku: normalizedSku, tenantId } });
     if (!entity) throw new NotFoundException(`Inventory SKU ${normalizedSku} not found`);
     return entity;
+  }
+
+  private reservationExpiresAt(entity: InventoryItemEntity): Date | null {
+    const raw = entity.metadata['reservationExpiresAt'];
+    if (typeof raw !== 'string') return null;
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   private async appendInventoryEvent(

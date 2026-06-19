@@ -6,6 +6,19 @@
   <tnl-trust-seal label="Inventory ledger" [state]="items.length ? 'verified' : 'pending'"></tnl-trust-seal>
 </section>
 
+@if (toastMessage || success || error) {
+  <aside
+    class="inventory-toast"
+    [class.inventory-toast-error]="toastTone === 'error' || !!error"
+    [attr.role]="toastTone === 'error' || error ? 'alert' : 'status'"
+    aria-live="polite"
+    data-testid="inventory-toast"
+  >
+    <span>{{ toastMessage || success || error }}</span>
+    <button type="button" (click)="dismissToast()" aria-label="Dismiss notification">Dismiss</button>
+  </aside>
+}
+
 <section class="inventory-panel inventory-alerts" data-testid="inventory-alerts">
   <div class="anomaly-header">
     <div>
@@ -54,6 +67,23 @@
   }
 </section>
 
+<section class="inventory-panel inventory-timeouts" data-testid="inventory-reservation-timeouts">
+  <div class="anomaly-header">
+    <div>
+      <h2>Reservation timeouts</h2>
+      <p>Release inventory reservations whose timeout has expired.</p>
+    </div>
+    <button
+      type="button"
+      data-testid="release-expired-reservations"
+      (click)="releaseExpiredReservations()"
+      [disabled]="operatingItemId === 'release-expired-reservations'"
+    >
+      {{ operatingItemId === 'release-expired-reservations' ? 'Releasing...' : 'Release expired reservations' }}
+    </button>
+  </div>
+</section>
+
 <section class="inventory-summary" aria-label="Inventory status summary">
   @for (status of statuses; track status) {
     <article>
@@ -70,6 +100,20 @@
   <p class="inventory-success" role="status" data-testid="inventory-success">{{ success }}</p>
 }
 
+<tnl-inventory-dashboard
+  [items]="items"
+  [total]="total"
+  [alerts]="alerts"
+  [anomalies]="anomalies"
+  [provenance]="provenance"
+  [loading]="loading"
+  [alertLoading]="alertLoading"
+  [anomalyLoading]="anomalyLoading"
+  (refreshInventory)="refreshDashboard()"
+  (generateAlerts)="generateAlerts()"
+  (detectAnomalies)="detectAnomalies()"
+></tnl-inventory-dashboard>
+
 <section class="inventory-layout">
   <form class="inventory-panel inventory-add" [formGroup]="addForm" (ngSubmit)="addInventory()" data-testid="inventory-add-form">
     <h2>Add inventory</h2>
@@ -80,6 +124,32 @@
     <label><span>Quantity</span><input type="number" min="0" formControlName="quantity" /></label>
     <label><span>Unit</span><input formControlName="unitOfMeasure" /></label>
     <button type="submit" [disabled]="submitting">{{ submitting ? 'Adding...' : 'Add inventory' }}</button>
+  </form>
+
+  <form class="inventory-panel inventory-scan" [formGroup]="importForm" (ngSubmit)="importInventoryBatch()" data-testid="inventory-import-form">
+    <h2>Import inventory</h2>
+    <label>
+      <span>JSON array or CSV rows</span>
+      <textarea
+        rows="8"
+        formControlName="payload"
+        placeholder="sku,name,locationId,locationName,quantity,unitOfMeasure"
+      ></textarea>
+    </label>
+    <button type="submit" [disabled]="operatingItemId === 'import'">
+      {{ operatingItemId === 'import' ? 'Importing inventory...' : 'Submit import' }}
+    </button>
+    @if (importResults.length) {
+      <ol class="batch-scan-results" aria-label="Inventory import results">
+        @for (result of importResults; track result.index) {
+          <li [class.batch-scan-rejected]="!result.success" data-testid="inventory-import-result">
+            <strong>{{ result.sku }}</strong>: {{ result.success ? 'Imported' : 'Rejected' }}
+            @if (result.item) { | {{ result.item.name }} at {{ result.item.locationName }} }
+            @if (result.error) { | {{ result.error }} }
+          </li>
+        }
+      </ol>
+    }
   </form>
 
   <form class="inventory-panel inventory-scan" [formGroup]="scanForm" (ngSubmit)="scanInventory()" data-testid="inventory-scan-form">
@@ -95,9 +165,68 @@
     <button type="submit" [disabled]="operatingItemId === 'scan'">
       {{ operatingItemId === 'scan' ? 'Scanning...' : 'Submit scan' }}
     </button>
+    @if (scanFeedbackState) {
+      <p
+        class="scan-feedback"
+        [class.scan-feedback-accepted]="scanFeedbackState === 'accepted'"
+        [class.scan-feedback-rejected]="scanFeedbackState === 'rejected'"
+        role="status"
+        data-testid="inventory-scan-feedback"
+      >
+        Scan {{ scanFeedbackState === 'accepted' ? 'accepted' : 'rejected' }}
+      </p>
+    }
   </form>
 
-  <section class="inventory-panel inventory-board">
+  <form class="inventory-panel inventory-scan" [formGroup]="batchScanForm" (ngSubmit)="scanInventoryBatch()" data-testid="inventory-batch-scan-form">
+    <h2>Bulk scan inventory</h2>
+    <label><span>SKU or serial numbers, one per line</span><textarea rows="6" formControlName="values"></textarea></label>
+    <label>
+      <span>Scan type</span>
+      <select formControlName="scanType">
+        @for (scanType of scanTypes; track scanType) { <option [value]="scanType">{{ scanType }}</option> }
+      </select>
+    </label>
+    <label><span>Scanned location ID (optional)</span><input formControlName="locationId" /></label>
+    <button type="submit" [disabled]="operatingItemId === 'batch-scan'">
+      {{ operatingItemId === 'batch-scan' ? 'Scanning batch...' : 'Submit bulk scan' }}
+    </button>
+    @if (batchScanResults.length) {
+      <ol class="batch-scan-results" aria-label="Bulk scan results">
+        @for (result of batchScanResults; track result.index) {
+          <li [class.batch-scan-rejected]="!result.success" data-testid="inventory-batch-scan-result">
+            <strong>{{ result.value }}</strong>: {{ result.success ? 'Accepted' : 'Rejected' }}
+            @if (result.item) { | {{ result.item.sku }} at {{ result.item.locationName }} }
+            @if (result.error) { | {{ result.error }} }
+          </li>
+        }
+      </ol>
+    }
+  </form>
+
+  <form class="inventory-panel inventory-scan" [formGroup]="bulkMoveForm" (ngSubmit)="moveInventoryBatch()" data-testid="inventory-bulk-move-form">
+    <h2>Bulk move inventory</h2>
+    <label><span>Inventory item IDs, one per line</span><textarea rows="6" formControlName="itemIds"></textarea></label>
+    <label><span>Destination ID</span><input formControlName="locationId" /></label>
+    <label><span>Destination name</span><input formControlName="locationName" /></label>
+    <label><span>Reason (optional)</span><input formControlName="reason" /></label>
+    <button type="submit" [disabled]="operatingItemId === 'bulk-move'">
+      {{ operatingItemId === 'bulk-move' ? 'Moving inventory...' : 'Submit bulk move' }}
+    </button>
+    @if (bulkMoveResults.length) {
+      <ol class="batch-scan-results" aria-label="Bulk move results">
+        @for (result of bulkMoveResults; track result.index) {
+          <li [class.batch-scan-rejected]="!result.success" data-testid="inventory-bulk-move-result">
+            <strong>{{ result.itemId }}</strong>: {{ result.success ? 'Moved' : 'Rejected' }}
+            @if (result.item) { | {{ result.item.sku }} at {{ result.item.locationName }} }
+            @if (result.error) { | {{ result.error }} }
+          </li>
+        }
+      </ol>
+    }
+  </form>
+
+  <section class="inventory-panel inventory-board" data-testid="inventory-board">
     <form class="inventory-filters" [formGroup]="filtersForm" (ngSubmit)="applyFilters()">
       <label><span>Search SKU or name</span><input type="search" formControlName="query" /></label>
       <label><span>Location ID</span><input formControlName="locationId" /></label>
@@ -144,8 +273,42 @@
                 <td>
                   {{ item.quantity }} {{ item.unitOfMeasure }}
                   @if (isLowStock(item)) { <span class="low-stock" data-testid="low-stock-label">Low stock</span> }
+                  @if (item.status !== 'removed') {
+                    <div class="quantity-controls">
+                      <label><span>New quantity</span><input #quantityAdjustment type="number" min="0" [value]="item.quantity" /></label>
+                      <label><span>Adjustment reason</span><input #quantityReason /></label>
+                      <button
+                        type="button"
+                        data-testid="adjust-inventory-quantity"
+                        (click)="adjustQuantity(item, quantityAdjustment.value, quantityReason.value)"
+                        [disabled]="operatingItemId === item.id"
+                      >Adjust</button>
+                    </div>
+                  }
                 </td>
-                <td><tnl-status-chip [label]="item.status" stateText="Ledger tracked" [tone]="statusTone(item.status)"></tnl-status-chip></td>
+                <td>
+                  <tnl-status-chip [label]="item.status" stateText="Ledger tracked" [tone]="statusTone(item.status)"></tnl-status-chip>
+                  @if (item.status !== 'removed' && item.status !== 'reserved') {
+                    <div class="status-controls">
+                      <label>
+                        <span>New status</span>
+                        <select #statusChange>
+                          <option value="available">available</option>
+                          <option value="in_transit">in_transit</option>
+                          <option value="damaged">damaged</option>
+                          <option value="expired">expired</option>
+                        </select>
+                      </label>
+                      <label><span>Status reason</span><input #statusReason /></label>
+                      <button
+                        type="button"
+                        data-testid="change-inventory-status"
+                        (click)="changeStatus(item, statusChange.value, statusReason.value)"
+                        [disabled]="operatingItemId === item.id"
+                      >Change</button>
+                    </div>
+                  }
+                </td>
                 <td>
                   <button type="button" data-testid="view-inventory-detail" (click)="loadDetail(item)" [disabled]="detailLoading">
                     View details
@@ -161,6 +324,7 @@
                     <p data-testid="reservation-summary">
                       {{ item.reservedQuantity }} {{ item.unitOfMeasure }} reserved
                       @if (item.reservationOrderId) { for order {{ item.reservationOrderId }} }
+                      @if (reservationExpiresAt(item)) { <br />Expires {{ reservationExpiresAt(item) }} }
                     </p>
                     <button
                       type="button"
@@ -178,10 +342,14 @@
                         <span>Order UUID (optional)</span>
                         <input #reservationOrderId />
                       </label>
+                      <label>
+                        <span>Timeout minutes (optional)</span>
+                        <input #reservationTimeoutMinutes type="number" min="1" max="10080" />
+                      </label>
                       <button
                         type="button"
                         data-testid="reserve-inventory"
-                        (click)="reserve(item, reserveQuantity.value, reservationOrderId.value)"
+                        (click)="reserve(item, reserveQuantity.value, reservationOrderId.value, reservationTimeoutMinutes.value)"
                         [disabled]="operatingItemId === item.id"
                       >Reserve</button>
                     </div>
@@ -255,6 +423,7 @@
       <div><dt>Quantity</dt><dd>{{ selectedItem.quantity }} {{ selectedItem.unitOfMeasure }}</dd></div>
       <div><dt>Reserved</dt><dd>{{ selectedItem.reservedQuantity }} {{ selectedItem.unitOfMeasure }}</dd></div>
       <div><dt>Related order</dt><dd>{{ selectedItem.reservationOrderId || 'None' }}</dd></div>
+      <div><dt>Reservation expires</dt><dd>{{ reservationExpiresAt(selectedItem) || 'None' }}</dd></div>
       <div><dt>Batch number</dt><dd>{{ selectedItem.batchNumber || 'None' }}</dd></div>
       <div><dt>Serial number</dt><dd>{{ selectedItem.serialNumber || 'None' }}</dd></div>
       <div><dt>Expiration date</dt><dd>{{ selectedItem.expirationDate || 'None' }}</dd></div>
@@ -262,6 +431,110 @@
       <div><dt>Created</dt><dd>{{ selectedItem.createdAt }}</dd></div>
       <div><dt>Updated</dt><dd>{{ selectedItem.updatedAt }}</dd></div>
     </dl>
+    <section class="inventory-detail-actions" data-testid="inventory-detail-actions" aria-label="Inventory detail operations">
+      <h3>Operations</h3>
+      @if (selectedItem.status === 'reserved') {
+        <p data-testid="detail-reservation-summary">
+          {{ selectedItem.reservedQuantity }} {{ selectedItem.unitOfMeasure }} reserved
+          @if (selectedItem.reservationOrderId) { for order {{ selectedItem.reservationOrderId }} }
+          @if (reservationExpiresAt(selectedItem)) { <br />Expires {{ reservationExpiresAt(selectedItem) }} }
+        </p>
+        <button
+          type="button"
+          data-testid="detail-release-inventory"
+          (click)="release(selectedItem)"
+          [disabled]="operatingItemId === selectedItem.id"
+        >Release reservation</button>
+      } @else if (selectedItem.status === 'available' && selectedItem.quantity > 0) {
+        <div class="reservation-controls">
+          <label>
+            <span>Reserve quantity</span>
+            <input #detailReserveQuantity type="number" min="1" [max]="selectedItem.quantity" value="1" />
+          </label>
+          <label>
+            <span>Order UUID (optional)</span>
+            <input #detailReservationOrderId />
+          </label>
+          <label>
+            <span>Timeout minutes (optional)</span>
+            <input #detailReservationTimeoutMinutes type="number" min="1" max="10080" />
+          </label>
+          <button
+            type="button"
+            data-testid="detail-reserve-inventory"
+            (click)="reserve(selectedItem, detailReserveQuantity.value, detailReservationOrderId.value, detailReservationTimeoutMinutes.value)"
+            [disabled]="operatingItemId === selectedItem.id"
+          >Reserve</button>
+        </div>
+      } @else {
+        <p>No reservation action available.</p>
+      }
+
+      @if (selectedItem.status !== 'removed') {
+        <div class="quantity-controls">
+          <label><span>New quantity</span><input #detailQuantityAdjustment type="number" min="0" [value]="selectedItem.quantity" /></label>
+          <label><span>Adjustment reason</span><input #detailQuantityReason /></label>
+          <button
+            type="button"
+            data-testid="detail-adjust-inventory-quantity"
+            (click)="adjustQuantity(selectedItem, detailQuantityAdjustment.value, detailQuantityReason.value)"
+            [disabled]="operatingItemId === selectedItem.id"
+          >Adjust quantity</button>
+        </div>
+      }
+
+      @if (selectedItem.status !== 'removed' && selectedItem.status !== 'reserved') {
+        <div class="status-controls">
+          <label>
+            <span>New status</span>
+            <select #detailStatusChange>
+              <option value="available">available</option>
+              <option value="in_transit">in_transit</option>
+              <option value="damaged">damaged</option>
+              <option value="expired">expired</option>
+            </select>
+          </label>
+          <label><span>Status reason</span><input #detailStatusReason /></label>
+          <button
+            type="button"
+            data-testid="detail-change-inventory-status"
+            (click)="changeStatus(selectedItem, detailStatusChange.value, detailStatusReason.value)"
+            [disabled]="operatingItemId === selectedItem.id"
+          >Change status</button>
+        </div>
+      }
+
+      @if (selectedItem.status !== 'removed') {
+        <div class="move-controls">
+          <label><span>Destination ID</span><input #detailMoveLocationId /></label>
+          <label><span>Destination name</span><input #detailMoveLocationName /></label>
+          <button
+            type="button"
+            data-testid="detail-move-inventory"
+            (click)="move(selectedItem, detailMoveLocationId.value, detailMoveLocationName.value)"
+            [disabled]="operatingItemId === selectedItem.id"
+          >Move</button>
+        </div>
+      } @else {
+        <p>Removed items cannot move.</p>
+      }
+
+      @if (selectedItem.status === 'removed') {
+        <p data-testid="detail-removal-summary">{{ selectedItem.removalReason }} | {{ selectedItem.removedAt }}</p>
+      } @else if (selectedItem.status !== 'reserved') {
+        <div class="removal-controls">
+          <label><span>Removal reason</span><input #detailRemovalReason /></label>
+          <button
+            type="button"
+            data-testid="detail-remove-inventory"
+            (click)="remove(selectedItem, detailRemovalReason.value)"
+            [disabled]="operatingItemId === selectedItem.id"
+          >Remove</button>
+        </div>
+      } @else {
+        <p>Release reservation before removal.</p>
+      }
+    </section>
   </section>
 }
 
@@ -276,6 +549,70 @@
       Quantity: {{ provenance.item.quantity }} {{ provenance.item.unitOfMeasure }}
     </p>
     <tnl-timeline-rail title="Inventory chain of custody" [entries]="provenanceEntries"></tnl-timeline-rail>
+    <section class="provenance-diagram" data-testid="inventory-provenance-diagram" aria-label="Inventory provenance diagram">
+      <h3>Provenance diagram</h3>
+      <ol>
+        @for (entry of provenanceDiagramEntries; track entry.id) {
+          <li [class.diagram-anomaly]="entry.anomalyState === 'anomaly'" data-testid="inventory-provenance-diagram-entry">
+            <strong>{{ entry.movement }}</strong>
+            <span>Actor: {{ entry.actor }}</span>
+            <span>Location: {{ entry.location }}</span>
+            <span>Quantity: {{ entry.quantity }}</span>
+            <span>State: {{ entry.anomalyState === 'anomaly' ? 'Anomaly' : 'Clear' }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+    <section class="location-history-diagram" data-testid="inventory-location-history-diagram" aria-label="Inventory location history diagram">
+      <h3>Location history</h3>
+      <ol>
+        @for (entry of provenanceLocationEntries; track entry.id) {
+          <li [class.diagram-anomaly]="entry.anomalyState === 'anomaly'" data-testid="inventory-location-history-entry">
+            <span class="location-step">Step {{ entry.step }}</span>
+            <strong>{{ entry.location }}</strong>
+            <span>{{ entry.movement }} by {{ entry.actor }}</span>
+            <span>State: {{ entry.anomalyState === 'anomaly' ? 'Anomaly' : 'Clear' }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+    <div class="inventory-history-grid">
+      <section data-testid="inventory-reservation-history">
+        <h3>Reservation history</h3>
+        @if (provenance.reservationHistory.length === 0) {
+          <p>No reservation activity recorded.</p>
+        } @else {
+          <ol class="provenance-events" aria-label="Inventory reservation history">
+            @for (event of provenance.reservationHistory; track event.eventId) {
+              <li data-testid="inventory-reservation-history-event">
+                <strong>{{ event.action }}</strong>
+                <span>{{ event.timestamp }} | {{ event.actorType }} / {{ event.actorId }}</span>
+                <span>Reserved quantity: {{ event.reservedQuantity ?? 0 }}</span>
+              </li>
+            }
+          </ol>
+        }
+      </section>
+      <section data-testid="inventory-scan-history">
+        <h3>Scan history</h3>
+        @if (provenance.scanHistory.length === 0) {
+          <p>No scans recorded.</p>
+        } @else {
+          <ol class="provenance-events" aria-label="Inventory scan history">
+            @for (event of provenance.scanHistory; track event.eventId) {
+              <li data-testid="inventory-scan-history-event">
+                <strong>{{ event.details['accepted'] === false ? 'Rejected' : 'Accepted' }} scan</strong>
+                <span>{{ event.timestamp }} | {{ event.actorType }} / {{ event.actorId }}</span>
+                <span>{{ event.locationName || event.locationId || 'Location not provided' }}</span>
+                @if (event.details['sourceEventType']) {
+                  <span>Source event: {{ event.details['sourceEventType'] }}</span>
+                }
+              </li>
+            }
+          </ol>
+        }
+      </section>
+    </div>
     <ol class="provenance-events" aria-label="Inventory provenance events">
       @for (event of provenance.events; track event.eventId) {
         <li data-testid="inventory-provenance-event">
@@ -316,6 +653,8 @@
         <option value="missing_scan">Missing scan</option>
         <option value="expired">Expired</option>
         <option value="damaged_not_removed">Damaged not removed</option>
+        <option value="unexpected_location">Unexpected location</option>
+        <option value="quantity_discrepancy">Quantity discrepancy</option>
       </select>
     </label>
     <label>
@@ -326,6 +665,14 @@
         <option value="error">Error</option>
         <option value="critical">Critical</option>
       </select>
+    </label>
+    <label>
+      <span>Detected from</span>
+      <input type="date" formControlName="detectedFrom" />
+    </label>
+    <label>
+      <span>Detected to</span>
+      <input type="date" formControlName="detectedTo" />
     </label>
     <button type="submit" [disabled]="anomalyLoading">Apply anomaly filters</button>
   </form>
@@ -341,6 +688,12 @@
           <p>Location: {{ anomaly.locationName }} ({{ anomaly.locationId }})</p>
           <p>Detected: {{ anomaly.detectedAt }}</p>
           <p data-testid="anomaly-remediation">Remediation: {{ anomaly.remediation }}</p>
+          <button
+            type="button"
+            data-testid="resolve-anomaly"
+            (click)="resolveAnomaly(anomaly)"
+            [disabled]="anomaly.status === 'resolved'"
+          >{{ anomaly.status === 'resolved' ? 'Resolved' : 'Mark resolved' }}</button>
         </article>
       }
     </div>
