@@ -12,6 +12,7 @@ interface ThrottlerStorageRecord {
 }
 
 describe('RateLimitGuard', () => {
+  const tenantId = '00000000-0000-4000-8000-000000000000';
   const originalMax = process.env.LEDGER_RATE_LIMIT_MAX;
   const originalWindow = process.env.LEDGER_RATE_LIMIT_WINDOW_MS;
   const ledgerEventsService: Pick<LedgerEventsService, 'appendEvent'> = {
@@ -48,7 +49,7 @@ describe('RateLimitGuard', () => {
       switchToHttp: () => ({
         getRequest: () => ({
           method,
-          tenantId: 'tenant-1',
+          tenantId,
           url: overrides.url ?? '/api/v1/ledger/events',
           path: overrides.path,
           route: overrides.routePath ? { path: overrides.routePath } : undefined,
@@ -61,7 +62,7 @@ describe('RateLimitGuard', () => {
           user: overrides.user ?? {
             userId: 'actor-1',
             actorType: 'user',
-            tenantId: 'tenant-1',
+              tenantId,
           },
         }),
       }),
@@ -111,13 +112,39 @@ describe('RateLimitGuard', () => {
         subjectType: 'auth',
         payload: expect.objectContaining({ action: 'RATE_LIMIT_EXCEEDED', method: 'POST' }),
       }),
-      expect.objectContaining({ userId: 'actor-1', actorType: 'user', tenantId: 'tenant-1' }),
-      'tenant-1',
+      expect.objectContaining({ userId: 'actor-1', actorType: 'user', tenantId }),
+      tenantId,
       expect.any(Object),
     );
     await expect(guard.canActivate(context('POST'))).rejects.toMatchObject({
       status: HttpStatus.TOO_MANY_REQUESTS,
     });
+  });
+
+  it('does not append a rate-limit event when the tenant is unknown', async () => {
+    process.env.LEDGER_RATE_LIMIT_MAX = '1';
+    reflector.getAllAndOverride.mockReturnValue(undefined);
+    throttlerStorage.increment.mockResolvedValue({
+      totalHits: 2,
+      timeToExpire: 60,
+      isBlocked: true,
+      timeToBlockExpire: 60,
+    });
+    const guard = new RateLimitGuard(reflector as never, ledgerEventsService as never, throttlerStorage as never);
+
+    await expect(
+      guard.canActivate(
+        context('POST', {
+          user: {
+            userId: 'unknown-user',
+            actorType: 'unknown',
+            tenantId: 'unknown',
+          },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(HttpException);
+
+    expect(ledgerEventsService.appendEvent).not.toHaveBeenCalled();
   });
 
   it('honors endpoint-specific rate limit metadata', async () => {
@@ -134,7 +161,7 @@ describe('RateLimitGuard', () => {
     await expect(guard.canActivate(context('POST'))).resolves.toBe(true);
     await expect(guard.canActivate(context('POST'))).rejects.toBeInstanceOf(HttpException);
     expect(throttlerStorage.increment).toHaveBeenCalledWith(
-      'default:tenant-1:user:actor-1:POST:/api/v1/ledger/events:127.0.0.1',
+      `default:${tenantId}:user:actor-1:POST:/api/v1/ledger/events:127.0.0.1`,
       1000,
       2,
       1000,
@@ -154,7 +181,7 @@ describe('RateLimitGuard', () => {
     const deviceUser = {
       userId: 'device-1',
       actorType: 'device',
-      tenantId: 'tenant-1',
+      tenantId,
     };
 
     await expect(
@@ -178,7 +205,7 @@ describe('RateLimitGuard', () => {
 
     expect(throttlerStorage.increment).toHaveBeenNthCalledWith(
       1,
-      'default:tenant-1:device:device-1:POST:/api/v1/devices/heartbeat:device',
+      `default:${tenantId}:device:device-1:POST:/api/v1/devices/heartbeat:device`,
       60_000,
       1,
       60_000,
@@ -186,7 +213,7 @@ describe('RateLimitGuard', () => {
     );
     expect(throttlerStorage.increment).toHaveBeenNthCalledWith(
       2,
-      'default:tenant-1:device:device-1:POST:/api/v1/device-events:device',
+      `default:${tenantId}:device:device-1:POST:/api/v1/device-events:device`,
       60_000,
       1,
       60_000,

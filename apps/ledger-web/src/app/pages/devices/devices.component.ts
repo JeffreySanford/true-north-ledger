@@ -8,6 +8,7 @@ import {
   DeviceType,
 } from '@true-north-ledger/shared-models';
 import { DevicesService } from '../../devices.service';
+import type { ConnectionStatusState } from '../../shared/connection-status/connection-status.component';
 import type { StatusChipTone } from '../../shared/status-chip/status-chip.component';
 
 @Component({
@@ -158,6 +159,44 @@ export class DevicesComponent implements OnInit, OnDestroy {
     }
 
     return device.status === 'active' ? 'warning' : 'neutral';
+  }
+
+  public deviceStateText(device: Device): string {
+    if (device.status === 'revoked') {
+      return 'Access revoked';
+    }
+
+    if (device.status === 'suspended') {
+      return 'Access blocked';
+    }
+
+    if (device.status === 'inactive') {
+      return 'Inactive';
+    }
+
+    return device.online ? 'Online' : 'Heartbeat missing';
+  }
+
+  public heartbeatConnectionState(device: Device): ConnectionStatusState {
+    if (device.online) {
+      return 'connected';
+    }
+
+    if (!device.lastSeenAt || (device.heartbeatFailureCount ?? 0) > 0) {
+      return 'failed';
+    }
+
+    return 'disconnected';
+  }
+
+  public heartbeatDetail(device: Device): string {
+    const failureCount = device.heartbeatFailureCount ?? 0;
+
+    if (failureCount > 0) {
+      return `${this.heartbeatText(device)}. ${failureCount} heartbeat failures`;
+    }
+
+    return this.heartbeatText(device);
   }
 
   public heartbeatText(device: Device): string {

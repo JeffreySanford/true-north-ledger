@@ -98,10 +98,19 @@
             </div>
 
             <tnl-status-chip
+              data-testid="device-state-chip"
               [label]="device.status"
-              [stateText]="device.online ? 'Online' : 'Offline'"
+              [stateText]="deviceStateText(device)"
               [tone]="statusTone(device)"
             ></tnl-status-chip>
+
+            <tnl-connection-status
+              class="device-card__heartbeat"
+              data-testid="device-heartbeat-state"
+              label="Heartbeat"
+              [state]="heartbeatConnectionState(device)"
+              [detail]="heartbeatDetail(device)"
+            ></tnl-connection-status>
 
             <div class="device-card__actions">
               <label>

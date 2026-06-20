@@ -19,9 +19,10 @@ describe('TimelineRailComponent', () => {
     ]);
     fixture.detectChanges();
 
-    const rail = fixture.nativeElement.querySelector('.tnl-timeline-rail') as HTMLElement;
+    const rail = fixture.nativeElement.querySelector('[data-testid="timeline-rail"]') as HTMLElement;
 
     expect(rail.getAttribute('aria-label')).toBe('Verification timeline: 4 entries');
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="timeline-rail-entry"]')).toHaveLength(4);
     expect(rail.textContent).toContain('Session started');
     expect(rail.textContent).toContain('Done');
     expect(rail.textContent).toContain('Proof check running');

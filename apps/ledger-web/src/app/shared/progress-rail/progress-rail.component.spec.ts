@@ -18,7 +18,7 @@ describe('ProgressRailComponent', () => {
     ]);
     fixture.detectChanges();
 
-    const rail = fixture.nativeElement.querySelector('.tnl-progress-rail') as HTMLElement;
+    const rail = fixture.nativeElement.querySelector('[data-testid="progress-rail"]') as HTMLElement;
 
     expect(rail.getAttribute('aria-label')).toBe('Auth setup progress: 1 of 3 complete');
     expect(rail.textContent).toContain('1 of 3 complete');
@@ -28,5 +28,7 @@ describe('ProgressRailComponent', () => {
     expect(rail.textContent).toContain('Current');
     expect(rail.textContent).toContain('Production token storage decided');
     expect(rail.textContent).toContain('Pending');
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="progress-rail-step"]')).toHaveLength(3);
+    expect(fixture.nativeElement.querySelector('[data-testid="progress-rail-step"]')?.getAttribute('aria-label')).toBe('Login created: Complete');
   });
 });

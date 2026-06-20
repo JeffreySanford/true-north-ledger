@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { randomUUID } from 'crypto';
 import type { InventoryItem } from '@true-north-ledger/inventory-contracts';
 
@@ -53,6 +53,14 @@ function toast(page: Page) {
   return page.getByTestId('inventory-toast');
 }
 
+async function openRowActions(row: Locator): Promise<void> {
+  const panel = row.getByTestId('inventory-row-actions');
+  await panel.evaluate((element) => {
+    (element as HTMLDetailsElement).open = true;
+    element.setAttribute('open', '');
+  });
+}
+
 test.beforeEach(async ({ page }) => seedSession(page));
 
 test('inventory page lists, filters, and adds tenant inventory', async ({ page }) => {
@@ -88,11 +96,38 @@ test('inventory page lists, filters, and adds tenant inventory', async ({ page }
 
   await page.goto('/inventory');
   await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible();
+  await expect(page.getByTestId('inventory-scan-band')).toContainText('Scan operations');
+  await expect(page.getByTestId('inventory-scan-band').getByTestId('inventory-scan-form')).toBeVisible();
+  await expect(page.getByTestId('inventory-bulk-band')).toContainText('Bulk operations');
+  await expect(page.getByTestId('inventory-bulk-band').getByTestId('inventory-import-form')).toBeVisible();
+  await expect(page.getByTestId('inventory-bulk-band').getByTestId('inventory-batch-scan-form')).toBeVisible();
+  await expect(page.getByTestId('inventory-bulk-band').getByTestId('inventory-bulk-move-form')).toBeVisible();
+  await expect(page.getByTestId('inventory-add-band')).toContainText('Add item');
+  await expect(page.getByTestId('inventory-add-band').getByTestId('inventory-add-form')).toBeVisible();
   await expect(page.getByTestId('inventory-dashboard')).toContainText('Inventory dashboard');
   await expect(page.getByTestId('dashboard-health')).toContainText('Low stock');
   await expect(page.getByTestId('dashboard-locations')).toContainText('Austin Warehouse - Aisle A1');
+  await expect(page.getByTestId('inventory-table').locator('th')).toHaveText(['SKU', 'Name', 'Location', 'Quantity', 'Status', 'Actions']);
   await expect(page.getByTestId('inventory-row')).toContainText('SKU-LOW');
+  await expect(page.getByTestId('inventory-row').getByTestId('status-chip')).toContainText('available');
   await expect(page.getByTestId('low-stock-label')).toHaveText('Low stock');
+  const row = page.getByTestId('inventory-row');
+  await expect(row.getByTestId('inventory-row-actions')).not.toHaveAttribute('open', '');
+  await openRowActions(row);
+  const compactActions = row.locator('.row-action-button');
+  await expect(compactActions).toHaveCount(7);
+  await expect(compactActions).toHaveText([
+    'iView details',
+    'tView timeline',
+    '#Adjust',
+    'sChange',
+    'rReserve',
+    'mMove',
+    'xRemove',
+  ]);
+  await expect(row.getByRole('button', { name: 'View details' })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'View timeline' })).toBeVisible();
+  expect(await compactActions.locator('.row-action-button__icon[aria-hidden="true"]').count()).toBe(7);
 
   await page.locator('.inventory-filters input[formcontrolname="query"]').fill('sensor');
   await page.getByRole('button', { name: 'Apply filters' }).click();
@@ -194,12 +229,66 @@ test('inventory page imports CSV inventory with per-row results', async ({ page 
   await expect(results).toHaveCount(2);
   await expect(results.nth(0)).toContainText('SKU-IMPORT-1: Imported');
   await expect(results.nth(1)).toContainText('SKU-100: Rejected');
+  await expect(results.nth(0)).not.toHaveClass(/batch-scan-rejected/);
+  await expect(results.nth(1)).toHaveClass(/batch-scan-rejected/);
+  await expect.poll(() => results.nth(0).evaluate((node) => getComputedStyle(node, '::before').content)).toContain('OK');
+  await expect.poll(() => results.nth(1).evaluate((node) => getComputedStyle(node, '::before').content)).toContain('ERR');
   expect(importPayload).toEqual({
     items: [
       expect.objectContaining({ sku: 'SKU-IMPORT-1', name: 'Imported sensor one', quantity: 6 }),
       expect.objectContaining({ sku: 'SKU-100', name: 'Duplicate sensor', quantity: 4 }),
     ],
   });
+});
+
+test('inventory page locks bulk action controls while import is pending', async ({ page }) => {
+  const imported = buildItem({
+    sku: 'SKU-IMPORT-1',
+    name: 'Imported sensor one',
+    quantity: 6,
+  });
+  let releaseImport!: () => void;
+
+  await page.route('**/api/v1/inventory**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'POST' && request.url().endsWith('/import')) {
+      await new Promise<void>((resolve) => {
+        releaseImport = resolve;
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          results: [{ index: 0, sku: 'SKU-IMPORT-1', success: true, item: imported }],
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [buildItem()], total: 1, page: 1, pageSize: 10 }),
+    });
+  });
+
+  await page.goto('/inventory');
+  const form = page.getByTestId('inventory-import-form');
+  await form.locator('textarea[formcontrolname="payload"]').fill([
+    'sku,name,locationId,locationName,quantity,unitOfMeasure',
+    'sku-import-1,Imported sensor one,AUSTIN-A1,Austin Warehouse - Aisle A1,6,each',
+  ].join('\n'));
+  await form.getByRole('button', { name: 'Submit import' }).click();
+
+  await expect(form).toHaveAttribute('aria-busy', 'true');
+  await expect(form.locator('fieldset')).toHaveAttribute('disabled', '');
+  await expect(form.getByTestId('inventory-import-status')).toContainText('Importing inventory');
+
+  releaseImport();
+
+  await expect(page.getByTestId('inventory-success')).toContainText('1 of 1 inventory items imported.');
+  await expect(form).toHaveAttribute('aria-busy', 'false');
+  await expect(form.locator('fieldset')).not.toHaveAttribute('disabled', '');
+  await expect(form.getByTestId('inventory-import-result')).toContainText('SKU-IMPORT-1: Imported');
 });
 
 test('inventory page reserves and releases available stock', async ({ page }) => {
@@ -226,14 +315,17 @@ test('inventory page reserves and releases available stock', async ({ page }) =>
 
   await page.goto('/inventory');
   const row = page.getByTestId('inventory-row');
+  await openRowActions(row);
   await row.locator('.reservation-controls input[type="number"]').nth(0).fill('3');
   await row.getByTestId('reserve-inventory').click();
   await expect(row.getByTestId('reservation-summary')).toContainText('3 each reserved');
   await expect(row).toContainText('7 each');
 
+  await openRowActions(row);
   await row.getByTestId('release-inventory').click();
-  await expect(row.getByTestId('reserve-inventory')).toBeVisible();
   await expect(row).toContainText('10 each');
+  await openRowActions(row);
+  await expect(row.getByTestId('reserve-inventory')).toBeVisible();
 });
 
 test('inventory page reserves with timeout and releases expired reservations', async ({ page }) => {
@@ -271,6 +363,7 @@ test('inventory page reserves with timeout and releases expired reservations', a
 
   await page.goto('/inventory');
   const row = page.getByTestId('inventory-row');
+  await openRowActions(row);
   await row.locator('.reservation-controls input[type="number"]').nth(0).fill('3');
   await row.locator('.reservation-controls input[type="number"]').nth(1).fill('15');
   await row.getByTestId('reserve-inventory').click();
@@ -279,6 +372,7 @@ test('inventory page reserves with timeout and releases expired reservations', a
 
   await page.getByTestId('release-expired-reservations').click();
   await expect(page.getByTestId('inventory-success')).toContainText('1 expired inventory reservations released.');
+  await openRowActions(row);
   await expect(row.getByTestId('reserve-inventory')).toBeVisible();
   await expect(row).toContainText('10 each');
 });
@@ -302,6 +396,7 @@ test('inventory page moves stock to a new location', async ({ page }) => {
 
   await page.goto('/inventory');
   const row = page.getByTestId('inventory-row');
+  await openRowActions(row);
   const moveControls = row.locator('.move-controls');
   await moveControls.locator('input').nth(0).fill('AUSTIN-B2');
   await moveControls.locator('input').nth(1).fill('Austin Warehouse - Aisle B2');
@@ -342,8 +437,12 @@ test('inventory page bulk moves newline-delimited item IDs and shows per-item re
   });
 
   await page.goto('/inventory');
+  await expect(page.getByTestId('inventory-row')).toHaveCount(2);
   const form = page.getByTestId('inventory-bulk-move-form');
-  await form.locator('textarea[formcontrolname="itemIds"]').fill(`${first.id}\n${second.id}`);
+  const itemIdsInput = form.locator('textarea[formcontrolname="itemIds"]');
+  const itemIds = `${first.id}\n${second.id}`;
+  await itemIdsInput.fill(itemIds);
+  await expect(itemIdsInput).toHaveValue(itemIds);
   await form.locator('input[formcontrolname="locationId"]').fill('AUSTIN-C3');
   await form.locator('input[formcontrolname="locationName"]').fill('Austin Warehouse - Aisle C3');
   await form.locator('input[formcontrolname="reason"]').fill('Bulk aisle rebalance');
@@ -392,6 +491,7 @@ test('inventory page adjusts quantity and changes status with reasons', async ({
 
   await page.goto('/inventory');
   const row = page.getByTestId('inventory-row');
+  await openRowActions(row);
   const quantityControls = row.locator('.quantity-controls');
   await quantityControls.locator('input').nth(0).fill('8');
   await quantityControls.locator('input').nth(1).fill('Cycle count reconciliation');
@@ -400,6 +500,7 @@ test('inventory page adjusts quantity and changes status with reasons', async ({
   await expect(row).toContainText('8 each');
   expect(quantityPayload).toEqual({ quantity: 8, reason: 'Cycle count reconciliation' });
 
+  await openRowActions(row);
   const statusControls = row.locator('.status-controls');
   await statusControls.locator('select').selectOption('damaged');
   await statusControls.locator('input').fill('Quality hold');
@@ -434,6 +535,7 @@ test('inventory page soft-removes stock with a required reason', async ({ page }
 
   await page.goto('/inventory');
   const row = page.getByTestId('inventory-row');
+  await openRowActions(row);
   await row.locator('.removal-controls input').fill('Damaged beyond repair');
   await row.getByTestId('remove-inventory').click();
 
@@ -467,7 +569,11 @@ test('inventory page submits a scan and shows accessible accepted feedback', asy
   await scanForm.locator('input[formcontrolname="value"]').fill('SERIAL-LOW-001');
   await scanForm.locator('select[formcontrolname="scanType"]').selectOption('barcode');
   await scanForm.locator('input[formcontrolname="locationId"]').fill('AUSTIN-A1');
+  const scanResponse = page.waitForResponse((response) =>
+    response.request().method() === 'POST' && response.url().endsWith('/scan') && response.status() === 200
+  );
   await scanForm.getByRole('button', { name: 'Submit scan' }).click();
+  await scanResponse;
 
   await expect(page.getByTestId('inventory-success')).toContainText('scan accepted');
   await expect(scanForm.getByTestId('inventory-scan-feedback')).toHaveText('Scan accepted');
@@ -510,6 +616,56 @@ test('inventory page exposes camera scan when barcode detection is available', a
 
   await expect(scanForm.locator('input[formcontrolname="value"]')).toHaveValue('SKU-CAMERA');
   await expect(page.getByTestId('inventory-success')).toContainText('Camera scan detected SKU-CAMERA');
+});
+
+test('inventory scan accepted feedback disables animation in reduced motion mode', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  let item = buildItem({ serialNumber: 'SERIAL-REDUCED-001' });
+
+  await page.route('**/api/v1/inventory**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'POST' && request.url().endsWith('/scan')) {
+      item = { ...item, lastScannedAt: '2026-06-12T05:00:00.000Z' };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(item) });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [item], total: 1, page: 1, pageSize: 10 }),
+    });
+  });
+
+  await page.goto('/inventory');
+  const scanForm = page.getByTestId('inventory-scan-form');
+  await scanForm.locator('input[formcontrolname="value"]').fill('SERIAL-REDUCED-001');
+  await scanForm.locator('select[formcontrolname="scanType"]').selectOption('barcode');
+  await scanForm.locator('input[formcontrolname="locationId"]').fill('AUSTIN-A1');
+  await scanForm.getByRole('button', { name: 'Submit scan' }).click();
+
+  const feedback = scanForm.getByTestId('inventory-scan-feedback');
+  await expect(feedback).toHaveText('Scan accepted');
+  await expect(feedback).toHaveCSS('animation-name', 'none');
+  await expect(feedback).toHaveCSS('transform', 'none');
+  await expect(toast(page)).toContainText('scan accepted');
+});
+
+test('inventory page surfaces failed network state without losing dashboard context', async ({ page }) => {
+  await page.route('**/api/v1/inventory**', async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Inventory API unavailable' }),
+    });
+  });
+
+  await page.goto('/inventory');
+
+  await expect(page.getByLabel('Inventory: Failed. Inventory API unavailable')).toBeVisible();
+  await expect(page.getByTestId('inventory-toast')).toContainText('Inventory API unavailable');
+  await expect(page.getByTestId('inventory-dashboard')).toContainText('No location inventory loaded');
+  await expect(page.getByTestId('inventory-board').getByTestId('empty-state')).toContainText('No inventory found');
 });
 
 test('inventory page shows rejected scan feedback without relying on motion', async ({ page }) => {
@@ -599,7 +755,10 @@ test('inventory page bulk scans newline-delimited values and shows per-item resu
 
   await page.goto('/inventory');
   const form = page.getByTestId('inventory-batch-scan-form');
-  await form.locator('textarea[formcontrolname="values"]').fill('SERIAL-LOW-001\nUNKNOWN');
+  const valuesInput = form.locator('textarea[formcontrolname="values"]');
+  const scanValues = 'SERIAL-LOW-001\nUNKNOWN';
+  await valuesInput.fill(scanValues);
+  await expect(valuesInput).toHaveValue(scanValues);
   await form.locator('select[formcontrolname="scanType"]').selectOption('barcode');
   await form.locator('input[formcontrolname="locationId"]').fill('AUSTIN-A1');
   await form.getByRole('button', { name: 'Submit bulk scan' }).click();
@@ -705,10 +864,15 @@ test('inventory page renders the complete provenance chain with actor and locati
   });
 
   await page.goto('/inventory');
-  await page.getByTestId('view-provenance').click();
+  const row = page.getByTestId('inventory-row');
+  await openRowActions(row);
+  await row.getByTestId('view-provenance').click();
 
   const provenance = page.getByTestId('inventory-provenance');
   await expect(provenance).toContainText('Inventory chain of custody');
+  await expect(provenance.getByTestId('timeline-rail')).toHaveAccessibleName('Inventory chain of custody: 2 entries');
+  await expect(provenance.getByTestId('timeline-rail-entry')).toHaveCount(2);
+  await expect(provenance.getByTestId('ledger-event-card')).toHaveCount(2);
   await expect(provenance.getByTestId('inventory-provenance-event')).toHaveCount(2);
   await expect(provenance).toContainText('INVENTORY_ADDED');
   await expect(provenance).toContainText('INVENTORY_SCANNED');
@@ -771,7 +935,11 @@ test('inventory page shows full item details and automatically loads provenance'
   });
 
   await page.goto('/inventory');
-  await page.getByTestId('view-inventory-detail').click();
+  const row = page.getByTestId('inventory-row').filter({ hasText: item.sku });
+  await openRowActions(row);
+  const detailButton = row.getByTestId('view-inventory-detail');
+  await expect(detailButton).toBeVisible();
+  await detailButton.click();
   await expect.poll(() => detailIncludedProvenance).toBe(true);
 
   const detail = page.getByTestId('inventory-detail');
@@ -837,7 +1005,11 @@ test('inventory detail view performs reservation, movement, and removal operatio
   });
 
   await page.goto('/inventory');
-  await page.getByTestId('view-inventory-detail').click();
+  const row = page.getByTestId('inventory-row').filter({ hasText: item.sku });
+  await openRowActions(row);
+  const detailButton = row.getByTestId('view-inventory-detail');
+  await expect(detailButton).toBeVisible();
+  await detailButton.click();
   const detail = page.getByTestId('inventory-detail');
   const actions = detail.getByTestId('inventory-detail-actions');
   await expect(actions).toContainText('Operations');
@@ -983,6 +1155,7 @@ test('inventory alerts show actionable severity labels and support filtering', a
   await page.getByTestId('generate-alerts').click();
   await expect(toast(page)).toContainText('1 inventory alerts generated and recorded.');
   const card = page.getByTestId('inventory-alert-card');
+  await expect(card.getByTestId('severity-chip')).toContainText('Warning');
   await expect(card).toContainText('Warning');
   await expect(card).toContainText('low_stock');
   await expect(card.getByTestId('alert-action')).toContainText('Replenish inventory');
@@ -1017,6 +1190,15 @@ test('inventory dashboard exposes health, recent scan, and quick action state', 
     remediation: 'Replenish inventory.',
     details: { quantity: 2, minimumQuantity: 5 },
   };
+  const criticalAnomaly = {
+    ...anomaly,
+    id: `${item.id}:quantity_discrepancy`,
+    type: 'quantity_discrepancy',
+    severity: 'critical',
+    detectedAt: '2026-06-13T06:00:00.000Z',
+    message: `${item.sku} quantity differs from expected quantity.`,
+    remediation: 'Run a cycle count.',
+  };
   const alert = {
     id: `${item.id}:low_stock:low_stock`,
     itemId: item.id,
@@ -1031,16 +1213,23 @@ test('inventory dashboard exposes health, recent scan, and quick action state', 
     action: 'Replenish inventory.',
     details: { quantity: 2, minimumQuantity: 5 },
   };
+  const expiringAlert = {
+    ...alert,
+    id: `${item.id}:expiring_soon`,
+    type: 'expiring_soon',
+    message: `${item.sku} expires soon.`,
+    action: 'Review expiration handling.',
+  };
 
   await page.route('**/api/v1/inventory**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     if (url.pathname.endsWith('/inventory/anomalies/detect')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ anomalies: [anomaly], total: 1 }) });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ anomalies: [anomaly, criticalAnomaly], total: 2 }) });
       return;
     }
     if (url.pathname.endsWith('/inventory/alerts/generate')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ alerts: [alert], total: 1 }) });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ alerts: [alert, expiringAlert], total: 2 }) });
       return;
     }
     await route.fulfill({
@@ -1058,6 +1247,9 @@ test('inventory dashboard exposes health, recent scan, and quick action state', 
 
   await dashboard.getByTestId('dashboard-alerts').click();
   await expect(dashboard.getByTestId('dashboard-health')).toContainText('Active alerts');
+  await expect(dashboard.getByTestId('dashboard-health')).toContainText('2Active alerts');
   await dashboard.getByTestId('dashboard-anomalies').click();
+  await expect(dashboard.getByTestId('dashboard-health')).toContainText('2Open anomalies');
+  await expect(dashboard.getByTestId('dashboard-recent-anomalies')).toContainText('critical SKU-LOW | quantity_discrepancy');
   await expect(dashboard.getByTestId('dashboard-recent-anomalies')).toContainText('warning SKU-LOW | low_stock');
 });

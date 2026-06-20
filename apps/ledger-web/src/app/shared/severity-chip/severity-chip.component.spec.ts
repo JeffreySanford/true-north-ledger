@@ -2,21 +2,30 @@ import { TestBed } from '@angular/core/testing';
 import { SeverityChipComponent } from './severity-chip.component';
 
 describe('SeverityChipComponent', () => {
-  it('renders severity level, message, and accessible non-color state', async () => {
+  beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [SeverityChipComponent],
     }).compileComponents();
+  });
 
+  it.each([
+    ['info', 'Info'],
+    ['success', 'Success'],
+    ['warning', 'Warning'],
+    ['error', 'Error'],
+    ['critical', 'Critical'],
+  ] as const)('renders %s level, message, and accessible non-color state', (level, label) => {
     const fixture = TestBed.createComponent(SeverityChipComponent);
-    fixture.componentRef.setInput('level', 'warning');
-    fixture.componentRef.setInput('message', 'Role setup incomplete');
+    const message = `${label} state message`;
+    fixture.componentRef.setInput('level', level);
+    fixture.componentRef.setInput('message', message);
     fixture.detectChanges();
 
-    const chip = fixture.nativeElement.querySelector('.tnl-severity-chip') as HTMLElement;
+    const chip = fixture.nativeElement.querySelector('[data-testid="severity-chip"]') as HTMLElement;
 
-    expect(chip.textContent).toContain('Warning');
-    expect(chip.textContent).toContain('Role setup incomplete');
-    expect(chip.getAttribute('aria-label')).toBe('Warning: Role setup incomplete');
-    expect(chip.classList).toContain('tnl-severity-chip--warning');
+    expect(chip.textContent).toContain(label);
+    expect(chip.textContent).toContain(message);
+    expect(chip.getAttribute('aria-label')).toBe(`${label}: ${message}`);
+    expect(chip.classList).toContain(`tnl-severity-chip--${level}`);
   });
 });

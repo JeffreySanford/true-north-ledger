@@ -6,9 +6,11 @@ import { DataSource } from 'typeorm';
 import { DEVICE_BATCH_PAYLOAD_MAX_BYTES, DEVICE_EVENT_PAYLOAD_MAX_BYTES } from '@true-north-ledger/device-contracts';
 import { AppModule } from '../app.module';
 import { RateLimitGuard } from '../auth/rate-limit.guard';
+import { createTestJwtToken } from '../auth/test-helpers';
 import { LedgerEventsService } from '../ledger-events/ledger-events.service';
 
 const tenantId = '00000000-0000-0000-0000-000000000000';
+const otherTenantId = '11111111-1111-4111-8111-111111111111';
 
 describe('DevicesController (Integration)', () => {
   let app: INestApplication;
@@ -16,6 +18,7 @@ describe('DevicesController (Integration)', () => {
   let rateLimitGuard: RateLimitGuard;
   let ledgerEventsService: LedgerEventsService;
   let token: string;
+  let otherTenantToken: string;
 
   beforeAll(async () => {
     process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret-000000000000000000000000000000';
@@ -45,6 +48,13 @@ describe('DevicesController (Integration)', () => {
       .send({ username: process.env.AUTH_USERNAME, password: process.env.AUTH_PASSWORD })
       .expect(200);
     token = login.body.accessToken;
+    otherTenantToken = createTestJwtToken({
+      sub: 'devices-other-tenant-admin',
+      username: 'devices.other.tenant',
+      actorType: 'user',
+      tenantId: otherTenantId,
+      permissions: ['devices.read', 'devices.manage'],
+    });
   });
 
   beforeEach(() => {
@@ -421,5 +431,59 @@ describe('DevicesController (Integration)', () => {
       .get('/api/v1/devices?page=1&pageSize=101')
       .set('Authorization', `Bearer ${token}`)
       .expect(400);
+  });
+
+  it('keeps device list and status detail reads isolated by tenant', async () => {
+    const tenantDevice = await request(app.getHttpServer())
+      .post('/api/v1/devices/register')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Tenant isolated scanner',
+        type: 'scanner',
+        metadata: { isolation: 'primary' },
+      })
+      .expect(201);
+
+    const otherTenantDevice = await request(app.getHttpServer())
+      .post('/api/v1/devices/register')
+      .set('Authorization', `Bearer ${otherTenantToken}`)
+      .send({
+        name: 'Other tenant isolated scanner',
+        type: 'scanner',
+        metadata: { isolation: 'other' },
+      })
+      .expect(201);
+
+    const tenantList = await request(app.getHttpServer())
+      .get('/api/v1/devices?search=isolated')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(tenantList.body.devices).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: tenantDevice.body.id, tenantId })]),
+    );
+    expect(
+      tenantList.body.devices.some((device: { id: string }) => device.id === otherTenantDevice.body.id),
+    ).toBe(false);
+
+    const otherTenantList = await request(app.getHttpServer())
+      .get('/api/v1/devices?search=isolated')
+      .set('Authorization', `Bearer ${otherTenantToken}`)
+      .expect(200);
+    expect(otherTenantList.body.devices).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: otherTenantDevice.body.id, tenantId: otherTenantId })]),
+    );
+    expect(
+      otherTenantList.body.devices.some((device: { id: string }) => device.id === tenantDevice.body.id),
+    ).toBe(false);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/devices/${otherTenantDevice.body.id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/devices/${tenantDevice.body.id}/status`)
+      .set('Authorization', `Bearer ${otherTenantToken}`)
+      .expect(404);
   });
 });

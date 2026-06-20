@@ -150,6 +150,47 @@ describe('DeviceRegistrationComponent', () => {
     expect(fixture.componentInstance.saving).toBe(false);
   });
 
+  it('shows QR pending while provisioning QR generation is still running', async () => {
+    fixture.componentInstance.registration = buildRegistration();
+    fixture.componentInstance.qrCodeDataUrl = null;
+    fixture.componentInstance.qrCodeError = null;
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('QR pending');
+    expect(root.querySelector('img[alt="QR code for Receiving scanner provisioning"]')).toBeNull();
+  });
+
+  it('renders compact provisioning sections with stable selectors for narrow layouts', () => {
+    fixture.componentInstance.registration = buildRegistration();
+    fixture.componentInstance.qrCodeDataUrl = 'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C/svg%3E';
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const panel = root.querySelector('[data-testid="device-provisioning-panel"]') as HTMLElement;
+    const details = root.querySelector('[data-testid="device-provisioning-details"]') as HTMLElement;
+    const actions = root.querySelector('[data-testid="device-provisioning-actions"]') as HTMLElement;
+    const qr = root.querySelector('[data-testid="device-provisioning-qr"]') as HTMLElement;
+
+    expect(panel).not.toBeNull();
+    expect(details.textContent).toContain('tnl_dev_key');
+    expect(actions.querySelectorAll('button')).toHaveLength(2);
+    expect(qr.textContent).toContain('One-time provisioning QR');
+    expect(qr.querySelector('img')?.getAttribute('alt')).toBe('QR code for Receiving scanner provisioning');
+  });
+
+  it('shows QR generation errors without hiding the one-time API key', async () => {
+    fixture.componentInstance.registration = buildRegistration();
+    fixture.componentInstance.qrCodeDataUrl = null;
+    fixture.componentInstance.qrCodeError = 'QR renderer unavailable';
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('tnl_dev_key');
+    expect(root.textContent).toContain('QR pending');
+    expect(root.textContent).toContain('QR error: QR renderer unavailable');
+  });
+
   it('copies one-time key material when clipboard is available', async () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', {

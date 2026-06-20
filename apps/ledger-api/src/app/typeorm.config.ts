@@ -23,7 +23,7 @@ const envFile =
     ? '.env.production'
     : '.env.development';
 
-config({ path: join(__dirname, '..', '..', '..', '..', envFile) });
+config({ path: join(__dirname, '..', '..', '..', '..', envFile), quiet: true });
 
 export const typeOrmConfig: DataSourceOptions = {
   type: 'postgres',

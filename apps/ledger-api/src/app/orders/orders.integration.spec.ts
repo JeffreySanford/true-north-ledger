@@ -142,6 +142,65 @@ describe('OrdersController (Integration)', () => {
     ]);
   });
 
+  it('replays order creation idempotently without duplicating order or audit events', async () => {
+    const idempotencyKey = 'integration-idempotent-001';
+    const first = await createOrder({
+      customerId: 'customer-idempotent-001',
+      customerName: 'Original Idempotent Customer',
+      idempotencyKey,
+    });
+    const replay = await createOrder({
+      customerId: 'customer-idempotent-001-replay',
+      customerName: 'Replay Should Not Replace Customer',
+      items: [
+        {
+          sku: 'SKU-REPLAY',
+          name: 'Replay item should not persist',
+          quantity: 4,
+          unitPrice: 99,
+        },
+      ],
+      idempotencyKey,
+    });
+
+    expect(replay.body).toMatchObject({
+      id: first.body.id,
+      orderNumber: first.body.orderNumber,
+      correlationId: first.body.correlationId,
+      customerId: 'customer-idempotent-001',
+      customerName: 'Original Idempotent Customer',
+      totalAmount: 99,
+    });
+
+    const orders = await dataSource.query(
+      `SELECT id, customer_id, customer_name, idempotency_key
+       FROM orders
+       WHERE tenant_id = $1 AND idempotency_key = $2`,
+      [tenantId, idempotencyKey],
+    );
+    expect(orders).toEqual([
+      expect.objectContaining({
+        id: first.body.id,
+        customer_id: 'customer-idempotent-001',
+        customer_name: 'Original Idempotent Customer',
+        idempotency_key: idempotencyKey,
+      }),
+    ]);
+
+    const auditEvents = await dataSource.query(
+      `SELECT payload->>'action' AS action, correlation_id
+       FROM ledger_events
+       WHERE subject_id = $1 AND payload->>'action' = $2`,
+      [first.body.id, OrderLedgerEventAction.ORDER_CREATED],
+    );
+    expect(auditEvents).toEqual([
+      expect.objectContaining({
+        action: OrderLedgerEventAction.ORDER_CREATED,
+        correlation_id: first.body.correlationId,
+      }),
+    ]);
+  });
+
   it('runs the full order lifecycle and keeps one correlation id across status events', async () => {
     const created = await createOrder({
       customerId: 'customer-lifecycle-001',

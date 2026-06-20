@@ -17,7 +17,9 @@ True North Ledger captures meaningful business actions as verifiable ledger even
 - `device` - scanner, printer, sensor, kiosk, tablet station, or edge gateway.
 - `system` - platform-owned automated process.
 
-Human users are authorized through RBAC roles such as `admin`, `operations_manager`, `inventory`, `shipping`, `billing`, `moderator`, `auditor`, `device_technician`, `support`, and `viewer`. Sprint 1 is turning the Sprint 0 guard foundation into product authentication with seeded roles, login/session UX, permission-aware navigation, and route gating.
+Human users are authorized through RBAC roles such as `admin`, `operations_manager`, `inventory`, `shipping`, `billing`, `moderator`, `auditor`, `device_technician`, `support`, and `viewer`. The current PI-1 implementation includes product authentication with seeded roles, login/session UX, permission-aware navigation, route gating, service tokens, user role assignment, and deactivation controls.
+
+The implemented operational slices now cover device management, order management, inventory management, ledger-backed provenance, and shared UI state primitives. Sprint 4.5 bridge work hardened permission states, responsive layouts, reduced-motion behavior, audit metadata consistency, tenant isolation, and retry/idempotency paths. Sprint 5 remains planned for WebSocket notifications, live operations UI, external alert transports, and production infrastructure.
 
 ## Main Workflows
 

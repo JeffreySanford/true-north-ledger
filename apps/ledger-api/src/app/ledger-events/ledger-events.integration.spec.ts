@@ -222,6 +222,29 @@ describe('LedgerEventsController (Integration)', () => {
       ).toBe(false);
     });
 
+    it('does not expose another tenant event by direct id lookup', async () => {
+      const otherTenantEvent = await request(app.getHttpServer())
+        .post('/api/v1/ledger/events')
+        .set('Authorization', `Bearer ${differentTenantToken}`)
+        .send(appendDto('other-tenant-detail-subject'))
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/ledger/events/${otherTenantEvent.body.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404);
+
+      const sameTenantEvent = await request(app.getHttpServer())
+        .get(`/api/v1/ledger/events/${otherTenantEvent.body.id}`)
+        .set('Authorization', `Bearer ${differentTenantToken}`)
+        .expect(200);
+      expect(sameTenantEvent.body).toMatchObject({
+        id: otherTenantEvent.body.id,
+        subjectId: 'other-tenant-detail-subject',
+        metadata: expect.objectContaining({ tenantId: otherTenantId }),
+      });
+    });
+
     it('rejects explicit cross-tenant requests and records tenant isolation violation event', async () => {
       await request(app.getHttpServer())
         .get('/api/v1/ledger/events')

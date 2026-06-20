@@ -131,6 +131,25 @@ describe('DevicesService', () => {
       });
   });
 
+  it('looks up device status by id and tenant together', (done) => {
+    const device = buildDevice({ id: '550e8400-e29b-41d4-a716-446655440111' });
+    repository.findOne.mockResolvedValueOnce(device);
+
+    service.getDeviceStatus(device.id, tenantId).subscribe({
+      next: (status) => {
+        expect(status).toMatchObject({
+          id: device.id,
+          tenantId,
+          name: 'Dock scanner',
+          status: 'active',
+        });
+        expect(repository.findOne).toHaveBeenCalledWith({ where: { id: device.id, tenantId } });
+        done();
+      },
+      error: done,
+    });
+  });
+
   it('registers a device, returns the raw API key once, and persists only the key hash', (done) => {
     service
       .registerDevice(

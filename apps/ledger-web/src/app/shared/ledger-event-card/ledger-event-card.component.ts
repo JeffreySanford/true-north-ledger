@@ -6,7 +6,12 @@ export type LedgerEventResult = 'accepted' | 'rejected' | 'failed';
   selector: 'tnl-ledger-event-card',
   standalone: false,
   template: `
-    <article class="tnl-ledger-event-card" [class]="'tnl-ledger-event-card--' + result" [attr.aria-label]="ariaLabel">
+    <article
+      class="tnl-ledger-event-card"
+      data-testid="ledger-event-card"
+      [class]="'tnl-ledger-event-card--' + result"
+      [attr.aria-label]="ariaLabel"
+    >
       <div class="tnl-ledger-event-card__header">
         <span class="tnl-ledger-event-card__type">{{ eventType }}</span>
         <span class="tnl-ledger-event-card__result">{{ resultText }}</span>

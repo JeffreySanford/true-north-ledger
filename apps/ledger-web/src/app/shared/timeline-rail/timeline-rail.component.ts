@@ -12,11 +12,11 @@ export interface TimelineRailEntry {
   selector: 'tnl-timeline-rail',
   standalone: false,
   template: `
-    <section class="tnl-timeline-rail" [attr.aria-label]="ariaLabel">
+    <section class="tnl-timeline-rail" data-testid="timeline-rail" [attr.aria-label]="ariaLabel">
       <h2 class="tnl-timeline-rail__title">{{ title }}</h2>
       <ol>
         @for (entry of entries; track entry.title + '-' + entry.timestamp) {
-          <li [class]="'tnl-timeline-rail__entry tnl-timeline-rail__entry--' + entry.state">
+          <li data-testid="timeline-rail-entry" [class]="'tnl-timeline-rail__entry tnl-timeline-rail__entry--' + entry.state">
             <span class="tnl-timeline-rail__marker" aria-hidden="true">{{ marker(entry.state) }}</span>
             <span class="tnl-timeline-rail__content">
               <span class="tnl-timeline-rail__entry-title">{{ entry.title }}</span>

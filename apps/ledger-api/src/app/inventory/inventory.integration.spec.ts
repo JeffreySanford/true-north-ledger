@@ -133,6 +133,58 @@ describe('InventoryController (Integration)', () => {
       .expect(400);
   });
 
+  it('keeps inventory import retries non-duplicating after accepted rows are replayed', async () => {
+    const items = [
+      { ...payload, sku: 'SKU-IMPORT-RETRY-1', name: 'Retry import one' },
+      { ...payload, sku: 'SKU-IMPORT-RETRY-2', name: 'Retry import two' },
+    ];
+
+    const first = await request(app.getHttpServer())
+      .post('/api/v1/inventory/import')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ items })
+      .expect(200);
+
+    expect(first.body.results).toEqual([
+      expect.objectContaining({ index: 0, sku: 'SKU-IMPORT-RETRY-1', success: true }),
+      expect.objectContaining({ index: 1, sku: 'SKU-IMPORT-RETRY-2', success: true }),
+    ]);
+
+    const replay = await request(app.getHttpServer())
+      .post('/api/v1/inventory/import')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ items })
+      .expect(200);
+
+    expect(replay.body.results).toEqual([
+      expect.objectContaining({
+        index: 0,
+        sku: 'SKU-IMPORT-RETRY-1',
+        success: false,
+        error: 'Inventory SKU SKU-IMPORT-RETRY-1 already exists for tenant',
+      }),
+      expect.objectContaining({
+        index: 1,
+        sku: 'SKU-IMPORT-RETRY-2',
+        success: false,
+        error: 'Inventory SKU SKU-IMPORT-RETRY-2 already exists for tenant',
+      }),
+    ]);
+
+    const events = await dataSource.query(
+      `SELECT payload->>'sku' AS sku, COUNT(*)::int AS event_count
+       FROM ledger_events
+       WHERE payload->>'sku' = ANY($1::text[]) AND payload->>'action' = $2
+       GROUP BY payload->>'sku'
+       ORDER BY sku`,
+      [['SKU-IMPORT-RETRY-1', 'SKU-IMPORT-RETRY-2'], InventoryLedgerEventAction.INVENTORY_ADDED],
+    );
+    expect(events).toEqual([
+      { sku: 'SKU-IMPORT-RETRY-1', event_count: 1 },
+      { sku: 'SKU-IMPORT-RETRY-2', event_count: 1 },
+    ]);
+  });
+
   it('filters inventory and isolates tenant records', async () => {
     const tenantList = await request(app.getHttpServer())
       .get('/api/v1/inventory?status=available&locationId=AUSTIN-A1&query=serialized')
@@ -379,6 +431,79 @@ describe('InventoryController (Integration)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ itemIds: [], locationId: 'AUSTIN-C3', locationName: 'Austin Warehouse - Aisle C3' })
       .expect(400);
+  });
+
+  it('keeps batch move retries per-item and does not duplicate accepted move events', async () => {
+    const first = await request(app.getHttpServer())
+      .post('/api/v1/inventory')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...payload, sku: 'SKU-BULK-RETRY-1', quantity: 4 })
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .post('/api/v1/inventory')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...payload, sku: 'SKU-BULK-RETRY-2', quantity: 5 })
+      .expect(201);
+    const missingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const itemIds = [first.body.id, missingId, second.body.id];
+
+    const firstMove = await request(app.getHttpServer())
+      .post('/api/v1/inventory/move/batch')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        itemIds,
+        locationId: 'AUSTIN-RETRY',
+        locationName: 'Austin Retry Location',
+        reason: 'Retry-safe rebalance',
+      })
+      .expect(200);
+
+    expect(firstMove.body.results).toEqual([
+      expect.objectContaining({ index: 0, itemId: first.body.id, success: true }),
+      expect.objectContaining({ index: 1, itemId: missingId, success: false, error: `Inventory item ${missingId} not found` }),
+      expect.objectContaining({ index: 2, itemId: second.body.id, success: true }),
+    ]);
+
+    const replay = await request(app.getHttpServer())
+      .post('/api/v1/inventory/move/batch')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        itemIds,
+        locationId: 'AUSTIN-RETRY',
+        locationName: 'Austin Retry Location',
+        reason: 'Retry-safe rebalance replay',
+      })
+      .expect(200);
+
+    expect(replay.body.results).toEqual([
+      expect.objectContaining({
+        index: 0,
+        itemId: first.body.id,
+        success: false,
+        error: 'Inventory item is already at the requested location',
+      }),
+      expect.objectContaining({ index: 1, itemId: missingId, success: false, error: `Inventory item ${missingId} not found` }),
+      expect.objectContaining({
+        index: 2,
+        itemId: second.body.id,
+        success: false,
+        error: 'Inventory item is already at the requested location',
+      }),
+    ]);
+
+    const events = await dataSource.query(
+      `SELECT subject_id, COUNT(*)::int AS event_count
+       FROM ledger_events
+       WHERE subject_id = ANY($1::text[]) AND payload->>'action' = $2
+       GROUP BY subject_id
+       ORDER BY subject_id`,
+      [[first.body.id, second.body.id], InventoryLedgerEventAction.INVENTORY_MOVED],
+    );
+    expect(events).toEqual(expect.arrayContaining([
+      { subject_id: first.body.id, event_count: 1 },
+      { subject_id: second.body.id, event_count: 1 },
+    ]));
+    expect(events).toHaveLength(2);
   });
 
   it('adjusts quantity and changes status with ledger provenance and guarded transitions', async () => {

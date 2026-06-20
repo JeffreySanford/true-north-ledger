@@ -16,7 +16,7 @@ describe('LedgerEventCardComponent', () => {
     fixture.componentRef.setInput('result', 'accepted');
     fixture.detectChanges();
 
-    const card = fixture.nativeElement.querySelector('.tnl-ledger-event-card') as HTMLElement;
+    const card = fixture.nativeElement.querySelector('[data-testid="ledger-event-card"]') as HTMLElement;
 
     expect(card.textContent).toContain('LOGIN_SUCCESS');
     expect(card.textContent).toContain('Accepted');

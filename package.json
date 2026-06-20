@@ -6,6 +6,7 @@
     "start:api": "nx run ledger-api:serve",
     "start:web": "nx run ledger-web:serve --configuration=development",
     "start:full": "node scripts/start-full.mjs",
+    "lint:all": "nx run-many --target=lint --all",
     "test:all": "nx run-many --target=test --all",
     "test:e2e": "nx e2e ledger-web-e2e",
     "docker:up": "node scripts/docker-up.mjs",

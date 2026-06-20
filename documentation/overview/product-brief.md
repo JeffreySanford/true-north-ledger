@@ -90,10 +90,16 @@ The repository contains a credible early platform foundation with:
 - Angular web frontend and Playwright E2E setup.
 - NestJS Ledger API with authenticated endpoints.
 - Initial auth endpoints, Angular login/logout UX, guarded routes, and permission-aware navigation.
+- Device management with device identity, authenticated ingestion, heartbeat/status workflows, and audit visibility.
+- Order management with lifecycle transitions, proof states, and ledger-backed timelines.
+- Inventory management with reservations, movement, scans, provenance, anomalies, alerts, and dashboard views.
 - Postgres-backed ledger persistence.
 - Shared contract libraries and schema-driven validation.
 - RBAC, tenant scoping, and rate limiting.
-- Shared MD3/SCSS UX direction for status chips, trust seals, mission cards, timelines, proof cards, connection state, and accessible animations.
+- Shared MD3/SCSS UX primitives for status chips, trust seals, mission cards, timelines, proof cards, connection state, empty/error states, and accessible animations.
+- Sprint 4.5 cross-sprint hardening for permission states, responsive layouts, reduced-motion behavior, visual primitive selectors, audit metadata consistency, tenant isolation, and retry/idempotency paths.
+
+Sprint 5 remains planned for WebSocket notifications, external notification transports, live operations UI, and production infrastructure hardening.
 
 ## Experience Direction
 

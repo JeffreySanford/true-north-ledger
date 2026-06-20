@@ -122,6 +122,43 @@ describe('InventoryDashboardComponent', () => {
     expect(host.querySelector('[data-testid="dashboard-recent-anomalies"]')?.textContent).toContain('No anomalies loaded');
   });
 
+  it('marks high-risk health and status metrics without relying on color alone', () => {
+    component.items = [
+      { ...baseItem, id: '66666666-6666-4666-8666-666666666666', sku: 'SKU-DMG', status: 'damaged', quantity: 1, expirationDate: null },
+      { ...baseItem, id: '77777777-7777-4777-8777-777777777777', sku: 'SKU-EXP', status: 'expired', quantity: 0, expirationDate: '2026-06-01' },
+    ];
+    component.anomalies = [{ ...anomaly, severity: 'critical', detectedAt: '2026-06-13T06:00:00.000Z' }];
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const riskMetrics = Array.from(host.querySelectorAll('.metric-risk'));
+
+    expect(host.querySelector('[data-testid="dashboard-status"]')?.textContent).toContain('damaged');
+    expect(host.querySelector('[data-testid="dashboard-status"]')?.textContent).toContain('expired');
+    expect(host.querySelector('[data-testid="dashboard-health"]')?.textContent).toContain('Open anomalies');
+    expect(riskMetrics.map((metric) => metric.textContent?.trim())).toEqual(expect.arrayContaining([
+      expect.stringContaining('damaged'),
+      expect.stringContaining('expired'),
+      expect.stringContaining('Open anomalies'),
+    ]));
+  });
+
+  it('shows mixed alert and anomaly state with newest anomaly first', () => {
+    component.alerts = [alert, { ...alert, id: `${baseItem.id}:expiring_soon`, type: 'expiring_soon', message: 'Expires soon' }];
+    component.anomalies = [
+      { ...anomaly, id: `${baseItem.id}:older`, severity: 'warning', type: 'low_stock', detectedAt: '2026-06-12T06:00:00.000Z' },
+      { ...anomaly, id: `${baseItem.id}:newer`, severity: 'critical', type: 'quantity_discrepancy', detectedAt: '2026-06-13T06:00:00.000Z' },
+    ];
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const anomalyItems = Array.from(host.querySelectorAll('[data-testid="dashboard-recent-anomalies"] li'));
+
+    expect(host.querySelector('[data-testid="dashboard-health"]')?.textContent).toContain('2Active alerts');
+    expect(anomalyItems[0]?.textContent).toContain('critical SKU-LOW | quantity_discrepancy');
+    expect(anomalyItems[1]?.textContent).toContain('warning SKU-LOW | low_stock');
+  });
+
   it('disables quick action controls while matching operations are loading', () => {
     component.loading = true;
     component.alertLoading = true;

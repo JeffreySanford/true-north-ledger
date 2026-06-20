@@ -6,7 +6,12 @@ export type SeverityChipLevel = 'info' | 'success' | 'warning' | 'error' | 'crit
   selector: 'tnl-severity-chip',
   standalone: false,
   template: `
-    <span class="tnl-severity-chip" [class]="'tnl-severity-chip--' + level" [attr.aria-label]="ariaLabel">
+    <span
+      class="tnl-severity-chip"
+      data-testid="severity-chip"
+      [class]="'tnl-severity-chip--' + level"
+      [attr.aria-label]="ariaLabel"
+    >
       <span class="tnl-severity-chip__level">{{ levelLabel }}</span>
       <span class="tnl-severity-chip__message">{{ message }}</span>
     </span>

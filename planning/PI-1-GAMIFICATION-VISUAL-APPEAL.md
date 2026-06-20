@@ -27,9 +27,9 @@ This addendum defines how True North Ledger becomes a secure command center with
 | --- | --- | --- | --- |
 | Sprint 0 | Experience model, severity/status vocabulary, accessibility guardrails, visual system principles | Complete | Captured in this addendum, `documentation/development/frontend-ux-system.md`, architecture docs, coding standards, and current-state docs. Sprint 0 remediation itself is complete; visual planning was added as a PI-1 addendum after the security baseline. |
 | Sprint 1 | MD3 theme foundation, auth shell polish, secure session indicators, mission onboarding | Complete | Secure session shell, permission-aware nav, MD3/theme primitives, Material Icons registry, reusable components, route animations, reduced-motion/high-contrast rules, and mission onboarding are implemented and covered by Sprint 1 checks. |
-| Sprint 2 | Device fleet command board, status icons, heartbeat sparklines, health/reliability seals | Planned | Tracked in Sprint 2 device UI, visual E2E, and documentation tasks. |
-| Sprint 3 | Order lifecycle milestone visuals, completeness rails, verified proof indicators | Planned | Tracked in Sprint 3 order timeline/proof UI, visual E2E, and documentation tasks. |
-| Sprint 4 | Inventory provenance timelines, scan feedback, anomaly cards | Planned | Tracked in Sprint 4 provenance, scan, anomaly UI, visual E2E, and documentation tasks. |
+| Sprint 2 | Device fleet command board, status icons, heartbeat sparklines, health/reliability seals | Complete | Device fleet visual states, heartbeat/registration/revocation states, shared chips/seals, empty/error states, and responsive Playwright coverage are implemented and tracked in Sprint 2 and Sprint 4.5 verification. |
+| Sprint 3 | Order lifecycle milestone visuals, completeness rails, verified proof indicators | Complete | Order lifecycle/completeness rails, proof hash and trust states, shared timeline/event primitives, reduced-motion support, and responsive Playwright coverage are implemented and tracked in Sprint 3 and Sprint 4.5 verification. |
+| Sprint 4 | Inventory provenance timelines, scan feedback, anomaly cards | Complete | Inventory provenance/location timelines, accepted/rejected scan feedback, anomaly and alert cards, health visuals, operation-state cleanup, and responsive Playwright coverage are implemented and tracked in Sprint 4 and Sprint 4.5 verification. |
 | Sprint 5 | Live feed, connection state, readiness score, demo mode | Planned | Tracked in Sprint 5 notification/live operations UI, visual E2E, and production/demo documentation tasks. |
 
 ### Sprint 0 completion note
@@ -177,6 +177,17 @@ As visual and gamification work is added, update the E2E plan to include:
 - Add Playwright checks for each new visual primitive the first time it appears in a sprint.
 - Keep screenshots or DOM assertions focused on business states, not animation timing.
 - Run the normal baseline before marking visual work done: `pnpm nx run-many -t lint test build` and `pnpm nx e2e ledger-web-e2e`.
+
+## Sprint 4.5 Adherence Review
+
+The Sprint 4.5 hardening work continues to follow the addendum:
+
+- Shared MD3 styles are centralized under `apps/ledger-web/src/styles/` and imported through `styles.scss`.
+- Inventory and order page styling was moved out of large page SCSS files into `_components.scss`, reducing component style-budget pressure.
+- Inventory operation polish uses server/API operation state (`operatingItemId`, loading flags, API responses) rather than client-only rewards or hardcoded success states.
+- Status, severity, trust, progress, connection, timeline, event, proof, and empty-state visuals retain text labels or accessible names so state does not rely on color alone.
+- Reduced-motion and responsive Playwright coverage exists for the visual states introduced through Sprint 4.5.
+- New visual assertions remain tied to workflow state: permission visibility, failed-network states, operation pending states, scan outcomes, proof failures, anomaly status, and provenance history.
 
 ## Implementation priorities
 

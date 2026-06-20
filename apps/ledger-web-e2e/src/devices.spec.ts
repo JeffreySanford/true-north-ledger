@@ -139,9 +139,10 @@ test('device registry registers a device and displays one-time API key', async (
 
   await page.goto('/devices');
   await expect(page.locator('h1.page-heading')).toHaveText('Devices');
-  await expect(page.locator('[data-testid="device-card"]', { hasText: 'Receiving scanner' })).toBeVisible();
+  const receivingScannerCard = page.locator('[data-testid="device-card"]', { hasText: 'Receiving scanner' });
+  await expect(receivingScannerCard).toBeVisible();
   await expect(page.getByLabel('active: Online')).toBeVisible();
-  await expect(page.getByText('Online since')).toBeVisible();
+  await expect(receivingScannerCard.getByTestId('connection-status')).toContainText('Online since');
 
   const nameInput = page.getByLabel('Device name');
   const metadataInput = page.getByLabel('Metadata JSON');
@@ -159,6 +160,61 @@ test('device registry registers a device and displays one-time API key', async (
   await expect(page.getByLabel('One-time device API key')).toContainText('Scan the QR code');
   await expect(page.getByLabel('Device provisioning QR code').locator('img')).toBeVisible();
   await expect(page.locator('[data-testid="device-card"]', { hasText: 'Gateway 01' })).toBeVisible();
+});
+
+test('device registration QR provisioning panel stays within a narrow mobile viewport', async ({ page }) => {
+  const devices: Device[] = [buildDevice()];
+
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.route('**/api/v1/devices**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (request.method() === 'GET' && url.pathname.endsWith('/api/v1/devices')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ devices, total: devices.length }),
+      });
+      return;
+    }
+
+    if (request.method() === 'POST' && url.pathname.endsWith('/api/v1/devices/register')) {
+      const registered = buildRegistration({
+        name: 'Narrow gateway',
+        type: 'gateway',
+        online: false,
+        lastSeenAt: null,
+      });
+      devices.unshift(registered);
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(registered),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/devices');
+  await page.getByLabel('Device name').fill('Narrow gateway');
+  await page.locator('select[formcontrolname="type"]').first().selectOption('gateway');
+  await page.getByLabel('Metadata JSON').fill('{"zone":"mobile"}');
+  await page.getByRole('button', { name: 'Register Device' }).click();
+
+  const panel = page.getByTestId('device-provisioning-panel');
+  const qr = page.getByTestId('device-provisioning-qr');
+  await expect(panel).toContainText('tnl_dev_e2e_key');
+  await expect(qr.locator('img')).toBeVisible();
+  await expect(page.getByTestId('device-provisioning-actions').getByRole('button')).toHaveCount(2);
+
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasHorizontalOverflow).toBe(false);
+
+  const qrBox = await qr.locator('img').boundingBox();
+  expect(qrBox?.width ?? 0).toBeLessThanOrEqual(288);
 });
 
 test('device registry copies one-time API key and QR provisioning payload', async ({ page }) => {
@@ -237,6 +293,7 @@ test('device fleet board exposes non-color visual states without horizontal over
   const devices: Device[] = [
     buildDevice({ name: 'Online scanner', status: 'active', online: true }),
     buildDevice({ name: 'Offline tablet', type: 'tablet', status: 'active', online: false, lastSeenAt: '2026-06-04T10:00:00.000Z' }),
+    buildDevice({ name: 'Inactive sensor', type: 'sensor', status: 'inactive', online: false, heartbeatFailureCount: 2 }),
     buildDevice({ name: 'Suspended gateway', type: 'gateway', status: 'suspended', online: false, lastSeenAt: null }),
     buildDevice({ name: 'Revoked kiosk', type: 'kiosk', status: 'revoked', online: false, revokedAt: '2026-06-04T11:00:00.000Z' }),
   ];
@@ -259,10 +316,37 @@ test('device fleet board exposes non-color visual states without horizontal over
 
   await expect(page.getByText('Online scanner')).toBeVisible();
   await expect(page.getByText('Offline tablet')).toBeVisible();
-  await expect(page.getByText('No heartbeat received')).toBeVisible();
+  await expect(page.getByText('Inactive sensor')).toBeVisible();
   await expect(page.getByText('Revoked kiosk')).toBeVisible();
   await expect(page.getByLabel('Device type: tablet')).toBeVisible();
+  await expect(page.getByLabel('Device type: sensor')).toBeVisible();
   await expect(page.getByLabel('Device type: gateway')).toBeVisible();
+
+  const onlineCard = page.locator('[data-testid="device-card"]', { hasText: 'Online scanner' });
+  await expect(onlineCard.getByTestId('status-chip')).toContainText('Online');
+  await expect(onlineCard.getByTestId('connection-status')).toContainText('Connected');
+  await expect(onlineCard.getByLabel('active: Online')).toBeVisible();
+  await expect(onlineCard.getByLabel(/Heartbeat: Connected/)).toBeVisible();
+
+  const offlineCard = page.locator('[data-testid="device-card"]', { hasText: 'Offline tablet' });
+  await expect(offlineCard.getByTestId('status-chip')).toContainText('Heartbeat missing');
+  await expect(offlineCard.getByTestId('connection-status')).toContainText('Disconnected');
+  await expect(offlineCard.getByLabel('active: Heartbeat missing')).toBeVisible();
+  await expect(offlineCard.getByLabel(/Heartbeat: Disconnected/)).toBeVisible();
+
+  const inactiveCard = page.locator('[data-testid="device-card"]', { hasText: 'Inactive sensor' });
+  await expect(inactiveCard.getByLabel('inactive: Inactive')).toBeVisible();
+  await expect(inactiveCard.getByLabel(/Heartbeat: Failed/)).toBeVisible();
+  await expect(inactiveCard).toContainText('2 heartbeat failures');
+
+  const suspendedCard = page.locator('[data-testid="device-card"]', { hasText: 'Suspended gateway' });
+  await expect(suspendedCard.getByLabel('suspended: Access blocked')).toBeVisible();
+  await expect(suspendedCard.getByLabel(/Heartbeat: Failed/)).toBeVisible();
+  await expect(suspendedCard).toContainText('No heartbeat received');
+  const revokedCard = page.locator('[data-testid="device-card"]', { hasText: 'Revoked kiosk' });
+  await expect(revokedCard.getByLabel('revoked: Access revoked')).toBeVisible();
+  await expect(revokedCard.locator('.device-card__actions select')).toBeDisabled();
+  await expect(revokedCard.getByRole('button', { name: 'Revoke' })).toBeDisabled();
 
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasHorizontalOverflow).toBe(false);

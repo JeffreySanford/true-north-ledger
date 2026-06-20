@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import type { InventoryItem } from '@true-north-ledger/inventory-contracts';
 import { InventoryService } from '../../inventory.service';
@@ -226,6 +226,50 @@ describe('InventoryComponent', () => {
       .toContain('Inventory dashboard');
   });
 
+  it('groups inventory operation forms into scan, bulk, and add-item bands', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    const scanBand = host.querySelector('[data-testid="inventory-scan-band"]') as HTMLElement;
+    const bulkBand = host.querySelector('[data-testid="inventory-bulk-band"]') as HTMLElement;
+    const addBand = host.querySelector('[data-testid="inventory-add-band"]') as HTMLElement;
+
+    expect(scanBand?.textContent).toContain('Scan operations');
+    expect(scanBand.querySelector('[data-testid="inventory-scan-form"]')).not.toBeNull();
+    expect(bulkBand?.textContent).toContain('Bulk operations');
+    expect(bulkBand.querySelector('[data-testid="inventory-import-form"]')).not.toBeNull();
+    expect(bulkBand.querySelector('[data-testid="inventory-batch-scan-form"]')).not.toBeNull();
+    expect(bulkBand.querySelector('[data-testid="inventory-bulk-move-form"]')).not.toBeNull();
+    expect(addBand?.textContent).toContain('Add item');
+    expect(addBand.querySelector('[data-testid="inventory-add-form"]')).not.toBeNull();
+  });
+
+  it('keeps inventory table columns focused and moves row controls behind an action panel', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    const headers = Array.from(host.querySelectorAll('[data-testid="inventory-table"] th')).map((header) => header.textContent?.trim());
+    const actionPanel = host.querySelector('[data-testid="inventory-row-actions"]') as HTMLDetailsElement;
+
+    expect(headers).toEqual(['SKU', 'Name', 'Location', 'Quantity', 'Status', 'Actions']);
+    expect(actionPanel.open).toBe(false);
+    expect(actionPanel.textContent).toContain('Quantity');
+    expect(actionPanel.querySelector('[data-testid="adjust-inventory-quantity"]')).not.toBeNull();
+    expect(actionPanel.querySelector('[data-testid="change-inventory-status"]')).not.toBeNull();
+    expect(actionPanel.querySelector('[data-testid="reserve-inventory"]')).not.toBeNull();
+    expect(actionPanel.querySelector('[data-testid="move-inventory"]')).not.toBeNull();
+    expect(actionPanel.querySelector('[data-testid="remove-inventory"]')).not.toBeNull();
+
+    const compactButtons = Array.from(actionPanel.querySelectorAll<HTMLButtonElement>('.row-action-button'));
+    expect(compactButtons.map((button) => button.textContent?.trim())).toEqual([
+      'iView details',
+      'tView timeline',
+      '#Adjust',
+      'sChange',
+      'rReserve',
+      'mMove',
+      'xRemove',
+    ]);
+    expect(compactButtons.every((button) => button.querySelector('.row-action-button__icon')?.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(compactButtons.every((button) => button.querySelector('.row-action-button__label')?.textContent?.trim())).toBe(true);
+  });
+
   it('submits valid inventory and reloads the list', () => {
     component.addForm.setValue({
       sku: 'sku-new',
@@ -261,11 +305,72 @@ describe('InventoryComponent', () => {
     expect(component.success).toBe('1 of 2 inventory items imported.');
     expect(component.importResults).toHaveLength(2);
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="inventory-import-result"]')).toHaveLength(2);
+    const importResults = (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="inventory-import-result"]');
+    expect(importResults).toHaveLength(2);
+    expect(importResults[0].classList.contains('batch-scan-rejected')).toBe(false);
+    expect(importResults[1].classList.contains('batch-scan-rejected')).toBe(true);
 
     component.importForm.setValue({ payload: 'sku,name,locationId,locationName,quantity,unitOfMeasure\nbad,Bad,AUSTIN-A1,Austin,NaN,each' });
     component.importInventoryBatch();
     expect(component.error).toBe('Imported inventory quantity must be a non-negative integer.');
+  });
+
+  it('exposes busy and disabled states while long-running bulk actions are pending', () => {
+    const importSubject = new Subject<{
+      results: Array<{ index: number; sku: string; success: boolean; item?: InventoryItem; error?: string }>;
+    }>();
+    importMock.mockReturnValueOnce(importSubject.asObservable());
+    component.importForm.setValue({
+      payload: 'sku,name,locationId,locationName,quantity,unitOfMeasure\nsku-import-1,Imported sensor one,AUSTIN-A1,Austin Warehouse - Aisle A1,6,each',
+    });
+    component.importInventoryBatch();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const importForm = host.querySelector('[data-testid="inventory-import-form"]') as HTMLElement;
+    expect(importForm.getAttribute('aria-busy')).toBe('true');
+    expect(importForm.querySelector('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(importForm.querySelector('[data-testid="inventory-import-status"]')?.textContent).toContain('Importing inventory');
+
+    importSubject.next({ results: [{ index: 0, sku: 'SKU-IMPORT-1', success: true, item }] });
+    importSubject.complete();
+    fixture.detectChanges();
+    expect(importForm.getAttribute('aria-busy')).toBe('false');
+    expect(importForm.querySelector('fieldset')?.hasAttribute('disabled')).toBe(false);
+
+    const batchScanSubject = new Subject<{
+      results: Array<{ index: number; value: string; success: boolean; item?: InventoryItem; error?: string }>;
+    }>();
+    batchScanMock.mockReturnValueOnce(batchScanSubject.asObservable());
+    component.batchScanForm.setValue({ values: 'SKU-LOW', scanType: 'barcode', locationId: 'AUSTIN-A1' });
+    component.scanInventoryBatch();
+    fixture.detectChanges();
+
+    const batchScanForm = host.querySelector('[data-testid="inventory-batch-scan-form"]') as HTMLElement;
+    expect(batchScanForm.getAttribute('aria-busy')).toBe('true');
+    expect(batchScanForm.querySelector('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(batchScanForm.querySelector('[data-testid="inventory-batch-scan-status"]')?.textContent).toContain('Scanning inventory batch');
+
+    batchScanSubject.next({ results: [{ index: 0, value: 'SKU-LOW', success: true, item }] });
+    batchScanSubject.complete();
+
+    const bulkMoveSubject = new Subject<{
+      results: Array<{ index: number; itemId: string; success: boolean; item?: InventoryItem; error?: string }>;
+    }>();
+    bulkMoveMock.mockReturnValueOnce(bulkMoveSubject.asObservable());
+    component.bulkMoveForm.setValue({
+      itemIds: item.id,
+      locationId: 'AUSTIN-C3',
+      locationName: 'Austin Warehouse - Aisle C3',
+      reason: 'Bulk rebalance',
+    });
+    component.moveInventoryBatch();
+    fixture.detectChanges();
+
+    const bulkMoveForm = host.querySelector('[data-testid="inventory-bulk-move-form"]') as HTMLElement;
+    expect(bulkMoveForm.getAttribute('aria-busy')).toBe('true');
+    expect(bulkMoveForm.querySelector('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(bulkMoveForm.querySelector('[data-testid="inventory-bulk-move-status"]')?.textContent).toContain('Moving inventory batch');
   });
 
   it('applies and resets list filters and validates negative quantities', () => {

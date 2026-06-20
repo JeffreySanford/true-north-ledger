@@ -1,15 +1,15 @@
 # Current State Assessment & Future Roadmap
 
-**Assessment Date:** 2026-06-04  
+**Assessment Date:** 2026-06-20
 **Project:** True North Ledger  
-**Version:** 0.1.0 (Early Foundation)  
-**Status:** Sprint 0 remediation complete; Sprint 1 product auth, RBAC, and shared UX foundation implementation is smoke-tested in the local development environment and ready for formal review
+**Version:** 0.1.0 (PI-1 implementation in progress)
+**Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, Sprint 2 device management, Sprint 3 order management, Sprint 4 inventory management, and Sprint 4.5 cross-sprint hardening are implemented; Sprint 5 real-time notifications and production infrastructure remain planned
 
 ---
 
 ## Executive Summary
 
-True North Ledger now has a **hardened early foundation** for the ledger slice: authenticated ledger endpoints, tenant isolation, permission checks, server-controlled audit metadata, audit chain fields/hashing, database chain constraints, rate limiting, formal error responses, Swagger/OpenAPI docs, CI quality gates, and passing local quality gates. Sprint 1 has also started productizing authentication with login/logout/refresh endpoints, an Angular login flow, guarded routes, permission-aware navigation, and Playwright coverage. The platform is still **NOT production-ready** because RBAC administration, production token storage hardening, broader product modules, deployment hardening, and production infrastructure remain.
+True North Ledger now has a **working PI-1 operational slice**: authenticated ledger endpoints, tenant isolation, permission checks, server-controlled audit metadata, audit chain fields/hashing, database chain constraints, rate limiting, formal error responses, Swagger/OpenAPI docs, auth/RBAC, device management, order management, inventory management, and Angular workflows for the implemented modules. Sprint 4.5 added cross-sprint hardening for permission states, visual primitives, responsive layouts, reduced-motion behavior, audit metadata consistency, tenant isolation, and retry/idempotency paths. The platform is still **NOT production-ready** because Sprint 5 real-time notifications, external notification transports, production monitoring, reverse proxy hardening, and deployment runbooks remain planned work.
 
 **Critical Findings:**
 - ✅ Ledger API now requires JWT authentication
@@ -21,28 +21,29 @@ True North Ledger now has a **hardened early foundation** for the ledger slice: 
 - ✅ Swagger UI and OpenAPI JSON are available at `/api/docs` and `/api/docs-json`
 - ✅ Unit, integration, lint, build, audit, and full Playwright E2E gates pass locally
 - ✅ Login/logout/session UX, permission-aware route guards, RBAC roles, user-role assignment, service tokens, and deactivation controls are implemented
-- ⚠️ Formal code review approval remains before Sprint 1 can be fully closed
+- ✅ Device management, order management, and inventory management are implemented with ledger-backed audit trails
+- ✅ Sprint 4.5 hardening coverage is implemented across API integration, Angular component/unit, and Playwright e2e suites
+- ⚠️ Real-time WebSocket notifications, external push/email transports, and production deployment infrastructure remain Sprint 5 scope
 
-**Next Phase:** Continue PI-1/Sprint 1 product auth, RBAC, and shared UX foundation work.
+**Next Phase:** Start PI-1/Sprint 5 real-time notifications and production infrastructure.
 
 ---
 
 ## Critical Issues (BLOCKING)
 
 ### Security Issues 🚨
-1. **Auth Productization Gap** - Login/logout/session UX, role assignment, deactivation, and service tokens exist, but registration/invitation and production token storage hardening are pending
-2. **No Full User Management Product** - JWT verification, login, role assignment, and deactivation exist, but registration/invitation workflows are pending
-   - Required runtime secrets now fail fast when missing instead of using committed fallback values
-3. **No Device/Service Token Product Flow** - Basic actor types exist, but provisioning and rotation are pending
-4. **No Production Deployment Hardening** - Reverse proxy, TLS, monitoring, and deployment runbooks are pending
-5. **No Business Modules Yet** - Orders, inventory, donations, and proof UX remain future sprint work
+1. **No Real-Time Transport Yet** - WebSocket notifications and live operations UI remain Sprint 5 work
+2. **No External Notification Transports Yet** - Inventory alerts are visible in-app; push/email delivery remains Sprint 5 or later work
+3. **No Production Deployment Hardening** - Reverse proxy, TLS, monitoring, and deployment runbooks are pending
+4. **Future Workflow Infrastructure Pending** - Location registry validation and reservation timeout background scheduling depend on future registry/job-runner infrastructure
+5. **Public Proof Pages Pending** - Internal proof generation exists; public proof verification pages remain roadmap work
 
 ### Quality Issues ⚠️
-1. **Swagger Coverage Is Initial** - API docs exist for the current ledger slice; future modules need endpoint examples as they land
+1. **Swagger Coverage Is Initial** - API docs exist for the current API surface; Sprint 5 should finish endpoint examples and OpenAPI polish
 2. **CI/CD Is New** - Quality gates are wired, but branch protection and required-check policy still need repository enforcement
 3. **Coverage Claims Need Discipline** - Behavior coverage is improving; avoid unsupported “100% coverage” claims
-4. **Production Hardening Remains** - Helmet/CORS policy, TLS enforcement, observability, and deployment runbooks are Sprint 1+ work
-5. **No Committed Token Fallback** - Frontend no longer commits a development JWT; Sprint 1 must keep product login/session behavior covered by tests
+4. **Production Hardening Remains** - Helmet/CORS policy, TLS enforcement, observability, and deployment runbooks are Sprint 5 work
+5. **Long-Running E2E Cost** - Full browser matrix coverage is broad; keep focused smoke suites for regular local iteration
 
 See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation plan.
 
@@ -447,26 +448,19 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 
 ## Next Steps
 
-### Immediate (This Week)
-1. Review PI-1 planning with team
-2. Confirm sprint goals and acceptance criteria
-3. Assign developers to Sprint 1 tasks
-4. Set up development environment for new team members
-5. Continue Sprint 1 implementation and keep planning checkboxes current
+### Immediate (Sprint 5 Start)
+1. Confirm Socket.IO vs native WebSocket decision and document the transport choice.
+2. Start the notifications gateway, authenticated subscription model, and tenant-isolated room strategy.
+3. Add live operations UI wiring for connection state, event feed highlights, readiness score, and demo mode using shared primitives.
+4. Begin production infrastructure work for health/readiness endpoints, reverse proxy, metrics, and deployment documentation.
+5. Keep deferred inventory alert transport, reservation scheduling, and location registry tests linked to the Sprint 5 or later infrastructure that enables them.
 
-### Week 1 (Sprint 1 Start)
-1. Complete RBAC role/user administration tasks
-2. Finish production token storage and refresh lifecycle decisions
-3. Build shared MD3 UX primitives and secure session visuals
-4. Daily standups to track progress
-5. Update SPRINT-1-TASKS.md checkboxes daily
-
-### End of Sprint 1 (Week 2)
-1. Complete formal code review and resolve any review findings
-2. Preserve the local development smoke baseline for Sprint 1 demo
-3. Add explicit coverage thresholds or new-code-only coverage reporting if the team wants the 90% target enforced automatically
-4. Sprint review demo
-5. Sprint retrospective and Sprint 2 planning
+### Sprint 5 Closeout
+1. Run full lint, unit/integration, build, and Playwright gates.
+2. Verify WebSocket connection, subscription, reconnection, tenant isolation, and live UI states.
+3. Verify production docs, environment guidance, monitoring setup, and deployment runbooks.
+4. Update README, current-state, and Sprint 5 task status with final verification commands.
+5. Prepare PI-1 demo using API-backed or approved fixture-backed data, clearly labeled when fixture-backed.
 
 ---
 
@@ -480,11 +474,12 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 | 2026-06-03 | Added Swagger/OpenAPI docs | API docs exposed at `/api/docs` and `/api/docs-json` |
 | 2026-06-03 | Started Sprint 1 auth productization | Login/logout/refresh endpoints, Angular login flow, guarded routes, permission-aware nav, and E2E auth checks added |
 | 2026-06-03 | Added PI-1 visual/UX planning | Shared MD3 styles, reusable UX primitives, animation budget, gamification guidance, and visual E2E gates documented |
-| 2026-06-04 | Sprint 1 local closeout gates passed | Lint, unit/integration tests with coverage, build, dependency audit, full Playwright E2E, Docker infrastructure, and local development smoke tests pass; formal code review approval remains |
-| Future | Full auth implementation (Sprint 1) | RBAC/user administration, production session hardening, and device/service auth become product-ready |
-| Future | Device management (Sprint 2) | Devices get identity |
-| Future | Orders module (Sprint 3) | Core business workflow |
-| Future | Inventory module (Sprint 4) | Supply chain tracking |
+| 2026-06-04 | Sprint 1 local closeout gates passed | Lint, unit/integration tests with coverage, build, dependency audit, full Playwright E2E, Docker infrastructure, and local development smoke tests pass |
+| 2026-06-20 | Sprint 4.5 bridge hardening completed | Cross-sprint permission, visual, responsive, reduced-motion, audit consistency, tenant isolation, retry/idempotency, and documentation hardening completed |
+| Complete | Full auth implementation (Sprint 1) | Login/session UX, RBAC/user administration, service tokens, permission-aware navigation, and route gating are product-ready for current workflows |
+| Complete | Device management (Sprint 2) | Devices have identity, authenticated ingestion, status management, and audit visibility |
+| Complete | Orders module (Sprint 3) | Core order workflow, lifecycle transitions, proof states, and audit trail are implemented |
+| Complete | Inventory module (Sprint 4) | Supply chain tracking, provenance, scans, alerts, anomalies, and dashboard are implemented |
 | Future | WebSockets (Sprint 5) | Real-time updates |
 
 ---
@@ -552,5 +547,5 @@ docker exec -it true-north-ledger-db psql -U ledger_user -d ledger_dev
 
 ---
 
-**Last Updated:** 2026-06-04  
-**Next Review:** End of Sprint 1 (2026-06-16)
+**Last Updated:** 2026-06-20
+**Next Review:** Sprint 5 closeout

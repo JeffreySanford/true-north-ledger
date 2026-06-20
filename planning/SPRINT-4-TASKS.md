@@ -478,6 +478,13 @@
 - [x] Combined detail/provenance increment verified with focused inventory API, Angular inventory service/component, and inventory Playwright suites
 - [x] Toaster notification increment verified with focused Angular inventory component and inventory Playwright suites
 - [x] Camera scan increment verified with focused Angular inventory component and inventory Playwright suites
+- [x] Sprint 4.5 hardening increment verified accepted-scan reduced-motion behavior, inventory failed-network state, login/auth-shell responsive behavior, and orders list failed-network/responsive behavior across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
+- [x] Sprint 4.5 unit/component hardening remains green in full ledger-web regression suite: 37 files / 228 tests
+- [x] Sprint 4.5 inventory operations cleanup verified scan, bulk, and add-item bands plus compact result rows with focused Angular component and Playwright coverage
+- [x] Sprint 4.5 inventory cleanup unit/component hardening remains green in full ledger-web regression suite: 37 files / 229 tests
+- [x] Sprint 4.5 inventory row action panel cleanup verified focused inventory table columns/actions with Angular component and Playwright coverage
+- [x] Sprint 4.5 inventory cleanup unit/component hardening remains green in full ledger-web regression suite: 37 files / 230 tests
+- [x] Sprint 4.5 shared MD3 Expressive style extraction reduced inventory/orders component style payloads and verified responsive inventory/orders e2e coverage
 - [x] `pnpm nx run-many --target=lint --all --skip-nx-cache --parallel=3` - all 10 projects passed
 - [x] `pnpm nx run-many --target=test --all --skip-nx-cache --parallel=3` - shared-models 26 tests, ledger-api 241 tests, ledger-web 203 tests passed
 - [x] `pnpm nx run-many --target=build --all --skip-nx-cache --parallel=3` - all 9 projects passed

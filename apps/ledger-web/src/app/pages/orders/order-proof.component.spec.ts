@@ -54,6 +54,9 @@ describe('OrderProofComponent', () => {
     component.generate.subscribe(generateSpy);
 
     expect(fixture.nativeElement.textContent).toContain('Proof not generated');
+    expect(fixture.nativeElement.textContent).toContain('Proof unavailable until a server proof is generated.');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="proof-state-strip"]')?.textContent)
+      .toContain('Verification pending');
 
     fixture.componentRef.setInput('loading', true);
     fixture.detectChanges();
@@ -81,6 +84,8 @@ describe('OrderProofComponent', () => {
       expect(component.proofState).toBe(expectedState);
       expect(fixture.nativeElement.textContent).toContain(expectedText);
       expect(fixture.nativeElement.textContent).toContain('ORDER_CREATED');
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="proof-state-strip"]')?.textContent)
+        .toContain(expectedState === 'verified' ? 'Proof verified against the ledger hash.' : 'Proof verification failed');
       const hashCard = (fixture.nativeElement as HTMLElement).querySelector('.tnl-proof-hash-card') as HTMLElement;
       expect(hashCard.classList).toContain(`tnl-proof-hash-card--${expectedState}`);
       expect(hashCard.getAttribute('aria-label')).toContain(expectedState === 'verified' ? 'Verified' : 'Failed');
@@ -95,6 +100,12 @@ describe('OrderProofComponent', () => {
     expect(component.proofState).toBe('pending');
     expect(hashCard.classList).toContain('tnl-proof-hash-card--pending');
     expect(hashCard.getAttribute('aria-label')).toContain('Pending');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="proof-state-strip"]')?.textContent)
+      .toContain('Proof generated and waiting for verification.');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="proof-metadata"]')?.textContent)
+      .toContain('44444444-4444-4444-8444-444444444444');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="proof-json-panel"] summary')?.textContent)
+      .toContain('Proof JSON');
     expect(fixture.nativeElement.querySelector('[data-testid="proof-verification-result"]')).toBeNull();
   });
 

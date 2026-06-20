@@ -67,7 +67,9 @@ export class LedgerEventsService {
         return this.entityToResponse(entity);
       }),
       catchError((error) => {
-        console.error(`Failed to fetch event ${id}`, error);
+        if (!(error instanceof NotFoundException)) {
+          console.error(`Failed to fetch event ${id}`, error);
+        }
         return throwError(() => error);
       })
     );

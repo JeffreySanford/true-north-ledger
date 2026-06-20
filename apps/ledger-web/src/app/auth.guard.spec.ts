@@ -4,6 +4,7 @@ import { ActivatedRouteSnapshot, Router, RouterStateSnapshot } from '@angular/ro
 import { RouterTestingModule } from '@angular/router/testing';
 import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { appRoutes } from './app.routes';
 import { authGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 
@@ -119,5 +120,43 @@ describe('authGuard', () => {
     );
 
     expect(result).toBe(true);
+  });
+
+  it('enforces the declared permission matrix for every secured Sprint route', () => {
+    isAuthenticated = true;
+    const securedRoutes = appRoutes.filter((route) => route.canActivate?.includes(authGuard));
+
+    for (const route of securedRoutes) {
+      const routeData = route.data as { requiredPermissions?: string[]; surface?: string };
+      const requiredPermissions = routeData.requiredPermissions ?? [];
+      const url = `/${route.path ?? ''}`;
+
+      const allowedPermissions = new Set(requiredPermissions);
+      (mockAuthService.hasPermission as ReturnType<typeof vi.fn>).mockImplementation((permission: string) =>
+        allowedPermissions.has(permission),
+      );
+      vi.mocked(router.navigate).mockClear();
+
+      const allowed = TestBed.runInInjectionContext(() =>
+        authGuard(createRouteSnapshot(routeData), createStateSnapshot(url)),
+      );
+
+      expect(allowed, `${url} should allow users with ${requiredPermissions.join(', ')}`).toBe(true);
+      expect(router.navigate).not.toHaveBeenCalled();
+
+      if (requiredPermissions.length === 0) {
+        continue;
+      }
+
+      allowedPermissions.delete(requiredPermissions[0]);
+      vi.mocked(router.navigate).mockClear();
+
+      const denied = TestBed.runInInjectionContext(() =>
+        authGuard(createRouteSnapshot(routeData), createStateSnapshot(url)),
+      );
+
+      expect(denied, `${url} should deny users missing ${requiredPermissions[0]}`).toBe(false);
+      expect(router.navigate).toHaveBeenCalledWith(['/unauthorized']);
+    }
   });
 });

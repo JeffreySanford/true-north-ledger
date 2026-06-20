@@ -2,7 +2,7 @@
 
 **Sprint Duration:** 2 weeks (July 29 - August 11, 2026)  
 **Sprint Goal:** Enable real-time updates via WebSockets and deploy production-ready infrastructure with monitoring.
-**Status:** Planned (not started as of 2026-06-04)
+**Status:** Planned next after Sprint 4.5 bridge completion as of 2026-06-20
 
 ---
 
@@ -105,6 +105,7 @@
   - [ ] ANOMALY_DETECTED
   - [ ] SYSTEM_ALERT
 - [ ] Add notification metadata (priority, category)
+- [ ] Add external inventory alert transport failure handling and tests once push/email delivery exists
 
 ### Unit Tests
 - [ ] Gateway tests
@@ -144,6 +145,9 @@
   - [ ] Subscribe to specific subject
   - [ ] Create matching and non-matching events
   - [ ] Verify only matching received
+- [ ] Inventory external notification negative-path integration tests after push/email channels exist
+- [ ] Inventory reservation timeout scheduling integration tests after a job runner exists
+- [ ] Location registry validation negative-path integration tests after the registry is introduced
 
 ---
 

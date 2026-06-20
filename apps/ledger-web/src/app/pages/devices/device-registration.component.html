@@ -36,18 +36,18 @@
 </form>
 
 @if (registration) {
-  <section class="api-key-panel" aria-label="One-time device API key">
-    <div class="api-key-panel__details">
+  <section class="api-key-panel" aria-label="One-time device API key" data-testid="device-provisioning-panel">
+    <div class="api-key-panel__details" data-testid="device-provisioning-details">
       <h2>{{ registration.name }} API Key</h2>
-      <code>{{ registration.apiKey }}</code>
-      <div class="api-key-panel__actions">
+      <code data-testid="device-api-key">{{ registration.apiKey }}</code>
+      <div class="api-key-panel__actions" data-testid="device-provisioning-actions">
         <button type="button" (click)="copyApiKey()">{{ copied ? 'Copied' : 'Copy Key' }}</button>
         <button type="button" (click)="copyProvisioningUri()">Copy QR Payload</button>
       </div>
       <p>Store this key now. The server persists only its hash.</p>
       <p>Scan the QR code to provision heartbeat and event ingestion endpoints on the device.</p>
     </div>
-    <figure class="api-key-panel__qr" aria-label="Device provisioning QR code">
+    <figure class="api-key-panel__qr" aria-label="Device provisioning QR code" data-testid="device-provisioning-qr">
       @if (qrCodeDataUrl) {
         <img [src]="qrCodeDataUrl" alt="QR code for {{ registration.name }} provisioning" />
       } @else {

@@ -8,14 +8,6 @@ import type { ProofHashState } from '../../shared/proof-hash-card/proof-hash-car
 @Component({
   standalone: false,
   selector: 'tnl-order-proof',
-  styles: [
-    `
-      :host {
-        grid-column: 1 / -1;
-        min-width: 0;
-      }
-    `,
-  ],
   template: `
     <article class="order-panel order-panel--wide" data-testid="order-proof-panel">
       <div class="panel-header">
@@ -29,6 +21,10 @@ import type { ProofHashState } from '../../shared/proof-hash-card/proof-hash-car
           <button type="button" class="secondary-button" (click)="downloadProof()" [disabled]="!proof">Download Proof</button>
         </div>
       </div>
+      <div class="proof-state-strip" data-testid="proof-state-strip">
+        <tnl-trust-seal label="Proof status" [state]="proofState"></tnl-trust-seal>
+        <p>{{ proofStateText }}</p>
+      </div>
       @if (proof) {
         <tnl-proof-hash-card [hash]="proof.proofHash" [state]="proofState"></tnl-proof-hash-card>
         @if (actionMessage) {
@@ -38,7 +34,17 @@ import type { ProofHashState } from '../../shared/proof-hash-card/proof-hash-car
           <tnl-trust-seal label="Proof verification" [state]="verification.valid ? 'verified' : 'failed'"></tnl-trust-seal>
           <p data-testid="proof-verification-result">{{ verification.valid ? 'Proof verified' : verification.reason }}</p>
         }
-        <pre data-testid="proof-json">{{ proofJson }}</pre>
+        <dl class="proof-metadata" data-testid="proof-metadata">
+          <div><dt>Order</dt><dd>{{ proof.orderNumber }}</dd></div>
+          <div><dt>Correlation ID</dt><dd>{{ proof.correlationId }}</dd></div>
+          <div><dt>Generated</dt><dd>{{ proof.generatedAt }}</dd></div>
+          <div><dt>Generator</dt><dd>{{ proof.generator }}</dd></div>
+          <div><dt>Ledger events</dt><dd>{{ proof.events.length }}</dd></div>
+        </dl>
+        <details class="proof-json-panel" data-testid="proof-json-panel">
+          <summary>Proof JSON</summary>
+          <pre data-testid="proof-json">{{ proofJson }}</pre>
+        </details>
       } @else {
         <tnl-empty-state title="Proof not generated" message="Generate a server proof from the order ledger timeline." icon="verified"></tnl-empty-state>
       }
@@ -59,7 +65,19 @@ export class OrderProofComponent {
     if (this.verification) {
       return this.verification.valid ? 'verified' : 'failed';
     }
-    return 'pending';
+    return this.proof ? 'pending' : 'pending';
+  }
+
+  public get proofStateText(): string {
+    if (!this.proof) {
+      return 'Proof unavailable until a server proof is generated.';
+    }
+    if (!this.verification) {
+      return 'Proof generated and waiting for verification.';
+    }
+    return this.verification.valid
+      ? 'Proof verified against the ledger hash.'
+      : `Proof verification failed: ${this.verification.reason ?? 'Hash mismatch'}.`;
   }
 
   public get proofJson(): string {

@@ -6,7 +6,12 @@ export type StatusChipTone = 'info' | 'success' | 'warning' | 'error' | 'neutral
   selector: 'tnl-status-chip',
   standalone: false,
   template: `
-    <span class="tnl-status-chip" [class]="'tnl-status-chip--' + tone" [attr.aria-label]="ariaLabel">
+    <span
+      class="tnl-status-chip"
+      data-testid="status-chip"
+      [class]="'tnl-status-chip--' + tone"
+      [attr.aria-label]="ariaLabel"
+    >
       <span class="tnl-status-chip__mark" aria-hidden="true"></span>
       <span class="tnl-status-chip__label">{{ label }}</span>
       <span class="tnl-status-chip__state">{{ stateText }}</span>

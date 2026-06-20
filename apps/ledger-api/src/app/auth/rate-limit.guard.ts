@@ -9,6 +9,8 @@ import {
 import { AuthLedgerEventAction } from '@true-north-ledger/ledger-contracts';
 import { RATE_LIMIT_KEY, RateLimitOptions } from './rate-limit.decorator';
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface RateLimitRequest {
   method?: string;
   tenantId?: string;
@@ -83,6 +85,10 @@ export class RateLimitGuard implements CanActivate {
     actorType: string,
     tenantId: string,
   ): void {
+    if (!UUID_PATTERN.test(tenantId)) {
+      return;
+    }
+
     const actor: AuthenticatedLedgerActor = {
       userId: actorId,
       actorType,

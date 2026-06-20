@@ -247,6 +247,30 @@ test('orders page lists, filters, and creates an order from server responses', a
   await expect(page.locator('[data-testid="order-card"]', { hasText: 'ORD-20260605-0003' })).toBeVisible();
 });
 
+test('orders list surfaces failed network state and stays within mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/v1/orders**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Orders API unavailable' }),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/orders');
+
+  await expect(page.getByTestId('order-error-state')).toContainText('Orders API unavailable');
+  await expect(page.getByTestId('order-error-state')).toContainText('Failed');
+  await expect(page.getByTestId('empty-state')).toContainText('No orders found');
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
 test('order creation steps validate fields, add and remove items, and submit all remaining items', async ({ page }) => {
   const orders: Order[] = [];
   let submittedItems: { sku: string; name: string; unitPrice: number }[] = [];
@@ -292,10 +316,14 @@ test('order creation steps validate fields, add and remove items, and submit all
 
   await page.getByRole('button', { name: 'Add item' }).click();
   await expect(page.getByTestId('order-create-item')).toHaveCount(2);
-  await page.getByTestId('order-create-item').nth(1).getByLabel('SKU').fill('SKU-COLD');
-  await expect(page.getByTestId('order-create-item').nth(1).getByLabel('Item name')).toHaveValue('Cold-chain monitor');
-  await expect(page.getByTestId('order-create-item').nth(1).getByLabel('Unit price')).toHaveValue('72');
-  await expect(page.getByTestId('order-create-item').nth(1).getByTestId('order-item-catalog').locator('option')).toHaveCount(3);
+  const secondItem = page.getByTestId('order-create-item').nth(1);
+  await expect(secondItem.getByTestId('order-item-catalog').locator('option')).toHaveCount(3);
+  const skuInput = secondItem.getByLabel('SKU');
+  await skuInput.click();
+  await skuInput.pressSequentially('SKU-COLD');
+  await expect(skuInput).toHaveValue('SKU-COLD');
+  await expect(secondItem.getByLabel('Item name')).toHaveValue('Cold-chain monitor');
+  await expect(secondItem.getByLabel('Unit price')).toHaveValue('72');
   await page.getByRole('button', { name: 'Remove item 1' }).click();
   await expect(page.getByTestId('order-create-item')).toHaveCount(1);
 
@@ -370,6 +398,54 @@ test('order detail advances status, cancels, and shows timeline updates', async 
   await expect(page.getByTestId('order-timeline')).toContainText('ORDER_STATUS_CHANGED');
 });
 
+test('order detail surfaces invalid transition errors without changing status', async ({ page }) => {
+  const order = buildOrder({ status: 'confirmed' });
+
+  await page.route('**/api/v1/orders**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (request.method() === 'GET' && url.pathname.endsWith('/api/v1/orders')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ orders: [order], total: 1, page: 1, pageSize: 1 }),
+      });
+      return;
+    }
+
+    if (request.method() === 'GET' && url.pathname.endsWith(`/api/v1/orders/${order.id}`)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildDetail(order, ['pending', 'confirmed'])),
+      });
+      return;
+    }
+
+    if (request.method() === 'PATCH' && url.pathname.endsWith(`/api/v1/orders/${order.id}/status`)) {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Invalid transition from confirmed to shipped' }),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto(`/orders/${order.id}`);
+  await expect(page.getByRole('heading', { name: order.orderNumber })).toBeVisible();
+  await expect(page.getByTestId('order-detail')).toContainText('confirmed');
+
+  await page.getByRole('button', { name: 'Mark processing' }).click();
+
+  await expect(page.getByTestId('order-detail-error')).toContainText('Invalid transition from confirmed to shipped');
+  await expect(page.getByTestId('order-detail').getByTestId('status-chip').filter({ hasText: 'confirmed' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark processing' })).toBeEnabled();
+});
+
 test('order detail completes the full lifecycle and shows every status in the timeline', async ({ page }) => {
   let order = buildOrder({ status: 'pending' });
   let statuses: OrderStatus[] = ['pending'];
@@ -428,9 +504,10 @@ test('order detail completes the full lifecycle and shows every status in the ti
   }
   await expect(page.getByTestId('order-timeline')).toContainText('ORDER_DELIVERED');
   await expect(page.getByTestId('order-timeline-connector')).toHaveCount(statuses.length - 1);
-  await expect(page.getByTestId('order-timeline-summary').locator('.tnl-timeline-rail__entry')).toHaveCount(statuses.length);
-  await expect(page.getByTestId('order-timeline-summary').locator('.tnl-timeline-rail__entry--current')).toContainText('ORDER_DELIVERED');
-  await expect(page.getByTestId('order-timeline').locator('.tnl-ledger-event-card')).toHaveCount(statuses.length);
+  await expect(page.getByTestId('order-timeline-summary').getByTestId('timeline-rail')).toHaveAccessibleName(`Order ledger milestones: ${statuses.length} entries`);
+  await expect(page.getByTestId('order-timeline-summary').getByTestId('timeline-rail-entry')).toHaveCount(statuses.length);
+  await expect(page.getByTestId('order-timeline-summary').getByTestId('timeline-rail-entry').filter({ hasText: 'ORDER_DELIVERED' })).toContainText('Current');
+  await expect(page.getByTestId('order-timeline').getByTestId('ledger-event-card')).toHaveCount(statuses.length);
 
   const deliveredEvent = page.getByTestId('order-timeline-event').filter({ hasText: 'ORDER_DELIVERED' }).first();
   await deliveredEvent.getByRole('button', { name: 'Show details' }).click();
@@ -439,6 +516,60 @@ test('order detail completes the full lifecycle and shows every status in the ti
   await expect(deliveredEvent.getByTestId('order-timeline-details')).toContainText('shipped');
   await deliveredEvent.getByRole('button', { name: 'Hide details' }).click();
   await expect(deliveredEvent.getByTestId('order-timeline-details')).toHaveCount(0);
+});
+
+test('order detail lifecycle rail wraps labels without mobile overflow', async ({ page }) => {
+  const order = buildOrder({ status: 'processing' });
+  const statuses: OrderStatus[] = ['pending', 'confirmed', 'processing'];
+
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.route('**/api/v1/orders**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (request.method() === 'GET' && url.pathname.endsWith('/api/v1/orders')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ orders: [order], total: 1, page: 1, pageSize: 1 }) });
+      return;
+    }
+
+    if (request.method() === 'GET' && url.pathname.endsWith(`/api/v1/orders/${order.id}`)) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildDetail(order, statuses)) });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto(`/orders/${order.id}`);
+
+  const detail = page.getByTestId('order-detail');
+  const lifecycleRail = detail.getByTestId('progress-rail').first();
+  const lifecycleSteps = lifecycleRail.getByTestId('progress-rail-step');
+  await expect(lifecycleRail).toHaveAccessibleName('Order lifecycle: 2 of 5 complete');
+  await expect(lifecycleSteps).toHaveCount(5);
+  await expect(lifecycleSteps.nth(0)).toContainText('pending');
+  await expect(lifecycleSteps.nth(0)).toContainText('Complete');
+  await expect(lifecycleSteps.nth(1)).toContainText('confirmed');
+  await expect(lifecycleSteps.nth(1)).toContainText('Complete');
+  await expect(lifecycleSteps.nth(2)).toContainText('processing');
+  await expect(lifecycleSteps.nth(2)).toContainText('Current');
+  await expect(lifecycleSteps.nth(3)).toContainText('shipped');
+  await expect(lifecycleSteps.nth(3)).toContainText('Pending');
+  await expect(lifecycleSteps.nth(4)).toContainText('delivered');
+  await expect(lifecycleSteps.nth(4)).toContainText('Pending');
+  await expect(page.getByTestId('order-timeline-summary').getByTestId('timeline-rail-entry')).toHaveCount(statuses.length);
+
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasHorizontalOverflow).toBe(false);
+
+  const stepsStayInsideRail = await lifecycleRail.evaluate((rail) => {
+    const railBox = rail.getBoundingClientRect();
+    return Array.from(rail.querySelectorAll('.tnl-progress-rail__step')).every((step) => {
+      const stepBox = step.getBoundingClientRect();
+      return stepBox.left >= railBox.left && stepBox.right <= railBox.right + 1;
+    });
+  });
+  expect(stepsStayInsideRail).toBe(true);
 });
 
 test('order detail generates and verifies proof without horizontal overflow on mobile', async ({ page }) => {
@@ -486,8 +617,13 @@ test('order detail generates and verifies proof without horizontal overflow on m
   await expect(deliveredEvent.getByTestId('order-timeline-details')).toContainText(order.correlationId);
 
   await expect(page.locator('tnl-order-proof')).toBeVisible();
+  await expect(page.getByTestId('proof-state-strip')).toContainText('Proof unavailable until a server proof is generated.');
   await page.getByRole('button', { name: 'Generate Proof' }).click();
   await expect(page.getByTestId('order-proof-panel')).toContainText('proof-hash-123');
+  await expect(page.getByTestId('proof-state-strip')).toContainText('Proof generated and waiting for verification.');
+  await expect(page.getByTestId('proof-metadata')).toContainText(order.correlationId);
+  await expect(page.getByTestId('proof-metadata')).toContainText('Ledger events');
+  await page.getByTestId('proof-json-panel').locator('summary').click();
   await expect(page.getByTestId('proof-json')).toContainText('ORDER_DELIVERED');
   await expect(page.getByTestId('order-proof-panel').locator('.tnl-proof-hash-card--pending')).toContainText('Pending');
 
@@ -499,10 +635,12 @@ test('order detail generates and verifies proof without horizontal overflow on m
   await page.getByRole('button', { name: 'Verify Proof' }).click();
   await expect(page.getByTestId('order-proof-panel').locator('.tnl-proof-hash-card--failed')).toContainText('Failed');
   await expect(page.getByTestId('proof-verification-result')).toHaveText('Proof mismatch');
+  await expect(page.getByTestId('proof-state-strip')).toContainText('Proof verification failed: Proof mismatch.');
 
   await page.getByRole('button', { name: 'Verify Proof' }).click();
   await expect(page.getByTestId('order-proof-panel').locator('.tnl-proof-hash-card--verified')).toContainText('Verified');
   await expect(page.getByTestId('proof-verification-result')).toHaveText('Proof verified');
+  await expect(page.getByTestId('proof-state-strip')).toContainText('Proof verified against the ledger hash.');
 
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasHorizontalOverflow).toBe(false);

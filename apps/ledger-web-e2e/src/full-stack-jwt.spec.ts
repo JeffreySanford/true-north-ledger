@@ -1,5 +1,6 @@
 /* eslint-disable playwright/no-skipped-test, playwright/no-conditional-in-test */
 import { expect, test } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 import { createHmac, randomUUID } from 'crypto';
 import { DEVICE_EVENT_PAYLOAD_MAX_BYTES } from '@true-north-ledger/device-contracts';
 
@@ -12,9 +13,42 @@ interface JwtPayload {
   exp: number;
 }
 
+interface LedgerEventResponse {
+  actorType: string;
+  actorId: string;
+  subjectType: string;
+  subjectId: string;
+  payload: {
+    action?: string;
+    sku?: string;
+    actorMetadata?: {
+      customerId?: string;
+    };
+  };
+  metadata: {
+    tenantId: string;
+    correlationId?: string;
+    requestId: string;
+    userAgent: string;
+    payloadHash: string;
+    eventHash: string;
+    result: string;
+  };
+}
+
+interface LoginResponseBody {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    userId: string;
+    tenantId: string;
+  };
+}
+
 const tenantId = '00000000-0000-0000-0000-000000000000';
 const authUsername = process.env['AUTH_USERNAME'] ?? 'admin';
 const authPassword = process.env['AUTH_PASSWORD'] ?? 'admin';
+let loginRequestCounter = 0;
 
 function base64Url(value: object): string {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -36,6 +70,27 @@ function createJwt(payload: Omit<JwtPayload, 'iat' | 'exp'>, expiresInSeconds = 
   });
   const signature = createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
   return `${header}.${body}.${signature}`;
+}
+
+async function login(
+  request: APIRequestContext,
+  label: string,
+  options: { correlationId?: string; userAgent?: string } = {},
+): Promise<LoginResponseBody> {
+  loginRequestCounter += 1;
+  const response = await request.post('/api/v1/auth/login', {
+    headers: {
+      'X-Correlation-Id': options.correlationId ?? `e2e-${label}-${loginRequestCounter}`,
+      'X-Forwarded-For': `10.240.0.${loginRequestCounter}`,
+      ...(options.userAgent ? { 'User-Agent': options.userAgent } : {}),
+    },
+    data: {
+      username: authUsername,
+      password: authPassword,
+    },
+  });
+  expect(response.status()).toBe(200);
+  return response.json() as Promise<LoginResponseBody>;
 }
 
 test.describe('ledger-web full-stack JWT flow', () => {
@@ -202,15 +257,7 @@ test.describe('ledger-web full-stack JWT flow', () => {
   test('invalidates access token after authenticated logout', async ({ request }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', 'Auth API revocation flow is backend-only and can run once per suite.');
 
-    const loginResponse = await request.post('/api/v1/auth/login', {
-      data: {
-        username: authUsername,
-        password: authPassword,
-      },
-    });
-    expect(loginResponse.status()).toBe(200);
-
-    const loginBody = await loginResponse.json();
+    const loginBody = await login(request, 'logout');
     const logoutResponse = await request.post('/api/v1/auth/logout', {
       headers: {
         Authorization: `Bearer ${loginBody.accessToken}`,
@@ -272,15 +319,7 @@ test.describe('ledger-web full-stack JWT flow', () => {
     test.skip(testInfo.project.name !== 'chromium', 'Device API integration flow runs once per suite.');
     const apiBaseUrl = process.env.E2E_API_BASE_URL ?? 'http://localhost:3000';
 
-    const loginResponse = await request.post('/api/v1/auth/login', {
-      data: {
-        username: authUsername,
-        password: authPassword,
-      },
-    });
-    expect(loginResponse.status()).toBe(200);
-
-    const loginBody = await loginResponse.json();
+    const loginBody = await login(request, 'device-event');
     let registrationResponse = await request.post('/api/v1/devices/register', {
       headers: {
         Authorization: `Bearer ${loginBody.accessToken}`,
@@ -414,15 +453,7 @@ test.describe('ledger-web full-stack JWT flow', () => {
     test.skip(testInfo.project.name !== 'chromium', 'Device API integration flow runs once per suite.');
     const apiBaseUrl = process.env.E2E_API_BASE_URL ?? 'http://localhost:3000';
 
-    const loginResponse = await request.post('/api/v1/auth/login', {
-      data: {
-        username: authUsername,
-        password: authPassword,
-      },
-    });
-    expect(loginResponse.status()).toBe(200);
-
-    const loginBody = await loginResponse.json();
+    const loginBody = await login(request, 'batch-device-events');
     let registrationResponse = await request.post('/api/v1/devices/register', {
       headers: {
         Authorization: `Bearer ${loginBody.accessToken}`,
@@ -498,15 +529,7 @@ test.describe('ledger-web full-stack JWT flow', () => {
     test.skip(testInfo.project.name !== 'chromium', 'Device API integration flow runs once per suite.');
     const apiBaseUrl = process.env.E2E_API_BASE_URL ?? 'http://localhost:3000';
 
-    const loginResponse = await request.post('/api/v1/auth/login', {
-      data: {
-        username: authUsername,
-        password: authPassword,
-      },
-    });
-    expect(loginResponse.status()).toBe(200);
-
-    const loginBody = await loginResponse.json();
+    const loginBody = await login(request, 'device-heartbeats');
     let registrationResponse = await request.post('/api/v1/devices/register', {
       headers: {
         Authorization: `Bearer ${loginBody.accessToken}`,
@@ -863,5 +886,364 @@ test.describe('ledger-web full-stack JWT flow', () => {
       const response = await matrixCase.run();
       expect(response.status(), `${matrixCase.name} status`).toBe(matrixCase.expectedStatus);
     }
+  });
+
+  test('exposes consistent audit metadata across auth, device, order, and inventory events', async ({ request }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'Cross-module API audit flow runs once per suite.');
+
+    const suiteId = randomUUID().slice(0, 8);
+    const loginBody = await login(request, `audit-${suiteId}`, {
+      correlationId: `e2e-auth-${suiteId}`,
+      userAgent: 'e2e-audit-auth',
+    });
+    const authorization = `Bearer ${loginBody.accessToken}`;
+
+    const registrationResponse = await request.post('/api/v1/devices/register', {
+      headers: {
+        Authorization: authorization,
+        'User-Agent': 'e2e-audit-device',
+        'X-Correlation-Id': `e2e-device-${suiteId}`,
+      },
+      data: {
+        name: `E2E audit scanner ${suiteId}`,
+        type: 'scanner',
+      },
+    });
+    test.skip(
+      registrationResponse.status() === 404,
+      'Devices endpoint is unavailable in the currently running reused dev server.',
+    );
+    expect(registrationResponse.status()).toBe(201);
+    const registrationBody = await registrationResponse.json();
+
+    const sku = `SKU-E2E-AUDIT-${suiteId.toUpperCase()}`;
+    const inventoryResponse = await request.post('/api/v1/inventory', {
+      headers: {
+        Authorization: authorization,
+        'User-Agent': 'e2e-audit-inventory',
+        'X-Correlation-Id': `e2e-inventory-${suiteId}`,
+      },
+      data: {
+        sku,
+        name: 'E2E audit inventory',
+        locationId: 'E2E-AUDIT',
+        locationName: 'E2E Audit Location',
+        quantity: 3,
+        unitOfMeasure: 'each',
+      },
+    });
+    test.skip(
+      inventoryResponse.status() === 404,
+      'Inventory endpoint is unavailable in the currently running reused dev server.',
+    );
+    expect(inventoryResponse.status()).toBe(201);
+    const inventoryBody = await inventoryResponse.json();
+
+    const orderResponse = await request.post('/api/v1/orders', {
+      headers: {
+        Authorization: authorization,
+        'User-Agent': 'e2e-audit-order',
+        'X-Correlation-Id': `e2e-order-${suiteId}`,
+      },
+      data: {
+        customerId: `customer-e2e-audit-${suiteId}`,
+        customerName: 'E2E Audit Customer',
+        customerEmail: 'audit.e2e@example.com',
+        items: [{ sku, name: 'E2E audit inventory', quantity: 1, unitPrice: 12 }],
+        currency: 'USD',
+        shippingAddress: {
+          line1: '100 E2E Audit Way',
+          city: 'Austin',
+          region: 'TX',
+          postalCode: '78701',
+          country: 'US',
+        },
+        idempotencyKey: `e2e-audit-${suiteId}`,
+      },
+    });
+    test.skip(
+      orderResponse.status() === 404,
+      'Orders endpoint is unavailable in the currently running reused dev server.',
+    );
+    expect(orderResponse.status()).toBe(201);
+    const orderBody = await orderResponse.json();
+
+    let events: LedgerEventResponse[] = [];
+    await expect
+      .poll(
+        async () => {
+          const response = await request.get('/api/v1/ledger/events', {
+            headers: { Authorization: authorization },
+          });
+          expect(response.status()).toBe(200);
+          events = (await response.json()) as LedgerEventResponse[];
+          return events.some(
+            (event) =>
+              event.subjectType === 'order' &&
+              event.subjectId === orderBody.id &&
+              event.payload.action === 'ORDER_CREATED',
+          );
+        },
+        {
+          timeout: 10_000,
+          intervals: [500, 1_000],
+        },
+      )
+      .toBe(true);
+
+    const authEvent = events.find(
+      (event) =>
+        event.subjectType === 'auth' &&
+        event.payload.action === 'LOGIN_SUCCESS' &&
+        event.metadata.correlationId === `e2e-auth-${suiteId}`,
+    );
+    const deviceEvent = events.find(
+      (event) => event.subjectType === 'device' && event.subjectId === registrationBody.id && event.payload.action === 'DEVICE_REGISTERED',
+    );
+    const inventoryEvent = events.find(
+      (event) => event.subjectType === 'inventory' && event.subjectId === inventoryBody.id && event.payload.action === 'INVENTORY_ADDED',
+    );
+    const orderEvent = events.find(
+      (event) => event.subjectType === 'order' && event.subjectId === orderBody.id && event.payload.action === 'ORDER_CREATED',
+    );
+
+    expect(authEvent?.metadata).toMatchObject({
+      tenantId,
+      correlationId: `e2e-auth-${suiteId}`,
+      result: 'accepted',
+    });
+    expect(deviceEvent?.metadata).toMatchObject({
+      tenantId,
+      correlationId: `e2e-device-${suiteId}`,
+      result: 'accepted',
+    });
+    expect(inventoryEvent?.metadata).toMatchObject({
+      tenantId,
+      correlationId: `e2e-inventory-${suiteId}`,
+      result: 'accepted',
+    });
+    expect(orderEvent?.metadata).toMatchObject({
+      tenantId,
+      correlationId: orderBody.correlationId,
+      result: 'accepted',
+    });
+    expect(inventoryEvent?.payload.sku).toBe(sku);
+    expect(orderEvent?.payload.actorMetadata?.customerId).toBe(`customer-e2e-audit-${suiteId}`);
+
+    for (const event of [authEvent, deviceEvent, inventoryEvent, orderEvent]) {
+      expect(event?.metadata.requestId).toMatch(/[0-9a-f-]{36}/);
+      expect(event?.metadata.payloadHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(event?.metadata.eventHash).toMatch(/^[a-f0-9]{64}$/);
+    }
+  });
+
+  test('keeps order idempotency and inventory import retries non-duplicating', async ({ request }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'Idempotency and retry API flow runs once per suite.');
+    const suiteId = randomUUID().slice(0, 8);
+    const loginBody = await login(request, `retry-${suiteId}`);
+    const authorization = `Bearer ${loginBody.accessToken}`;
+    const skuOne = `SKU-E2E-RETRY-${suiteId.toUpperCase()}-1`;
+    const skuTwo = `SKU-E2E-RETRY-${suiteId.toUpperCase()}-2`;
+    const idempotencyKey = `e2e-order-retry-${suiteId}`;
+
+    const orderRequest = {
+      customerId: `customer-e2e-retry-${suiteId}`,
+      customerName: 'E2E Retry Customer',
+      customerEmail: 'retry.e2e@example.com',
+      items: [{ sku: skuOne, name: 'E2E retry item', quantity: 1, unitPrice: 19 }],
+      currency: 'USD',
+      shippingAddress: {
+        line1: '200 E2E Retry Way',
+        city: 'Austin',
+        region: 'TX',
+        postalCode: '78701',
+        country: 'US',
+      },
+      idempotencyKey,
+    };
+
+    const orderResponse = await request.post('/api/v1/orders', {
+      headers: {
+        Authorization: authorization,
+        'X-Correlation-Id': `e2e-order-retry-${suiteId}`,
+      },
+      data: orderRequest,
+    });
+    test.skip(orderResponse.status() === 404, 'Orders endpoint is unavailable in the currently running reused dev server.');
+    expect(orderResponse.status()).toBe(201);
+    const orderBody = await orderResponse.json();
+
+    const replayOrderResponse = await request.post('/api/v1/orders', {
+      headers: {
+        Authorization: authorization,
+        'X-Correlation-Id': `e2e-order-retry-replay-${suiteId}`,
+      },
+      data: {
+        ...orderRequest,
+        customerName: 'E2E Retry Customer Replay',
+        items: [{ sku: skuTwo, name: 'Replay item should not persist', quantity: 3, unitPrice: 99 }],
+      },
+    });
+    expect(replayOrderResponse.status()).toBe(201);
+    const replayOrderBody = await replayOrderResponse.json();
+    expect(replayOrderBody).toMatchObject({
+      id: orderBody.id,
+      orderNumber: orderBody.orderNumber,
+      correlationId: orderBody.correlationId,
+      customerName: 'E2E Retry Customer',
+    });
+
+    const importRequest = {
+      items: [
+        {
+          sku: skuOne,
+          name: 'E2E retry inventory one',
+          locationId: 'E2E-RETRY',
+          locationName: 'E2E Retry Location',
+          quantity: 2,
+          unitOfMeasure: 'each',
+        },
+        {
+          sku: skuTwo,
+          name: 'E2E retry inventory two',
+          locationId: 'E2E-RETRY',
+          locationName: 'E2E Retry Location',
+          quantity: 3,
+          unitOfMeasure: 'each',
+        },
+      ],
+    };
+
+    const importResponse = await request.post('/api/v1/inventory/import', {
+      headers: { Authorization: authorization },
+      data: importRequest,
+    });
+    test.skip(importResponse.status() === 404, 'Inventory endpoint is unavailable in the currently running reused dev server.');
+    expect(importResponse.status()).toBe(200);
+    const importBody = await importResponse.json();
+    expect(importBody.results).toEqual([
+      expect.objectContaining({ sku: skuOne, success: true }),
+      expect.objectContaining({ sku: skuTwo, success: true }),
+    ]);
+
+    const replayImportResponse = await request.post('/api/v1/inventory/import', {
+      headers: { Authorization: authorization },
+      data: importRequest,
+    });
+    expect(replayImportResponse.status()).toBe(200);
+    const replayImportBody = await replayImportResponse.json();
+    expect(replayImportBody.results).toEqual([
+      expect.objectContaining({ sku: skuOne, success: false }),
+      expect.objectContaining({ sku: skuTwo, success: false }),
+    ]);
+
+    let events: LedgerEventResponse[] = [];
+    await expect
+      .poll(
+        async () => {
+          const response = await request.get('/api/v1/ledger/events', {
+            headers: { Authorization: authorization },
+          });
+          expect(response.status()).toBe(200);
+          events = (await response.json()) as LedgerEventResponse[];
+          const orderCreatedEvents = events.filter(
+            (event) =>
+              event.subjectType === 'order' &&
+              event.subjectId === orderBody.id &&
+              event.payload.action === 'ORDER_CREATED',
+          );
+          const inventoryAddedEvents = events.filter(
+            (event) =>
+              event.subjectType === 'inventory' &&
+              event.payload.action === 'INVENTORY_ADDED' &&
+              [skuOne, skuTwo].includes(event.payload.sku ?? ''),
+          );
+          return `${orderCreatedEvents.length}:${inventoryAddedEvents.length}`;
+        },
+        {
+          timeout: 10_000,
+          intervals: [500, 1_000],
+        },
+      )
+      .toBe('1:2');
+  });
+
+  test('keeps device lists, device status, and ledger event details tenant isolated', async ({ request }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'Tenant isolation API flow runs once per suite.');
+    const suiteId = randomUUID().slice(0, 8);
+    const otherTenantId = '11111111-1111-4111-8111-111111111111';
+    const loginBody = await login(request, `tenant-isolation-${suiteId}`);
+    const authorization = `Bearer ${loginBody.accessToken}`;
+    const otherTenantAuthorization = `Bearer ${createJwt({
+      sub: `e2e-other-tenant-${suiteId}`,
+      actorType: 'user',
+      tenantId: otherTenantId,
+      permissions: ['devices.read', 'devices.manage', 'ledger.read', 'ledger.write'],
+    })}`;
+
+    const tenantDeviceResponse = await request.post('/api/v1/devices/register', {
+      headers: { Authorization: authorization },
+      data: {
+        name: `E2E tenant scanner ${suiteId}`,
+        type: 'scanner',
+      },
+    });
+    test.skip(tenantDeviceResponse.status() === 404, 'Devices endpoint is unavailable in the currently running reused dev server.');
+    expect(tenantDeviceResponse.status()).toBe(201);
+    const tenantDevice = await tenantDeviceResponse.json();
+
+    const otherTenantDeviceResponse = await request.post('/api/v1/devices/register', {
+      headers: { Authorization: otherTenantAuthorization },
+      data: {
+        name: `E2E other tenant scanner ${suiteId}`,
+        type: 'scanner',
+      },
+    });
+    expect(otherTenantDeviceResponse.status()).toBe(201);
+    const otherTenantDevice = await otherTenantDeviceResponse.json();
+
+    const tenantListResponse = await request.get(`/api/v1/devices?search=${suiteId}`, {
+      headers: { Authorization: authorization },
+    });
+    expect(tenantListResponse.status()).toBe(200);
+    const tenantList = await tenantListResponse.json();
+    expect(tenantList.devices).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: tenantDevice.id, tenantId })]),
+    );
+    expect(tenantList.devices.some((device: { id: string }) => device.id === otherTenantDevice.id)).toBe(false);
+
+    const crossTenantStatusResponse = await request.get(`/api/v1/devices/${otherTenantDevice.id}/status`, {
+      headers: { Authorization: authorization },
+    });
+    expect(crossTenantStatusResponse.status()).toBe(404);
+
+    const otherTenantEventResponse = await request.post('/api/v1/ledger/events', {
+      headers: { Authorization: otherTenantAuthorization },
+      data: {
+        type: 'LEDGER_EVENT',
+        subjectType: 'tenant-isolation-e2e',
+        subjectId: `other-tenant-event-${suiteId}`,
+        payload: { action: 'TENANT_ISOLATION_E2E' },
+      },
+    });
+    test.skip(otherTenantEventResponse.status() === 404, 'Ledger events endpoint is unavailable in the currently running reused dev server.');
+    expect(otherTenantEventResponse.status()).toBe(201);
+    const otherTenantEvent = await otherTenantEventResponse.json();
+
+    const crossTenantEventDetailResponse = await request.get(`/api/v1/ledger/events/${otherTenantEvent.id}`, {
+      headers: { Authorization: authorization },
+    });
+    expect(crossTenantEventDetailResponse.status()).toBe(404);
+
+    const otherTenantEventDetailResponse = await request.get(`/api/v1/ledger/events/${otherTenantEvent.id}`, {
+      headers: { Authorization: otherTenantAuthorization },
+    });
+    expect(otherTenantEventDetailResponse.status()).toBe(200);
+    const otherTenantEventDetail = await otherTenantEventDetailResponse.json();
+    expect(otherTenantEventDetail).toMatchObject({
+      id: otherTenantEvent.id,
+      subjectId: `other-tenant-event-${suiteId}`,
+      metadata: expect.objectContaining({ tenantId: otherTenantId }),
+    });
   });
 });

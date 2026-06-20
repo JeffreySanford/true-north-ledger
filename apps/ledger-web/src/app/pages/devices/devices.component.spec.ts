@@ -180,13 +180,70 @@ describe('DevicesComponent', () => {
     expect(revokeButton.disabled).toBe(true);
   });
 
+  it('renders non-color state labels for active, offline, suspended, and revoked devices', async () => {
+    listDevicesMock.mockReturnValueOnce(of({
+      devices: [
+        buildDevice({ id: 'active-device', name: 'Online scanner', status: 'active', online: true }),
+        buildDevice({ id: 'offline-device', name: 'Offline tablet', type: 'tablet', status: 'active', online: false }),
+        buildDevice({ id: 'inactive-device', name: 'Inactive sensor', type: 'sensor', status: 'inactive', online: false, heartbeatFailureCount: 2 }),
+        buildDevice({ id: 'suspended-device', name: 'Suspended gateway', type: 'gateway', status: 'suspended', online: false, lastSeenAt: null }),
+        buildDevice({ id: 'revoked-device', name: 'Revoked kiosk', type: 'kiosk', status: 'revoked', online: false, revokedAt: now }),
+      ],
+      total: 5,
+      page: 1,
+      pageSize: 5,
+    }));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const cards = Array.from(root.querySelectorAll<HTMLElement>('[data-testid="device-card"]'));
+
+    expect(cards).toHaveLength(5);
+    expect(cards[0].textContent).toContain('Online scanner');
+    expect(cards[0].textContent).toContain('active');
+    expect(cards[0].textContent).toContain('Online');
+    expect(cards[0].querySelector('.tnl-status-chip')?.getAttribute('aria-label')).toBe('active: Online');
+    expect(cards[0].querySelector('.tnl-connection-status')?.getAttribute('aria-label')).toContain('Heartbeat: Connected');
+    expect(cards[1].textContent).toContain('Offline tablet');
+    expect(cards[1].textContent).toContain('active');
+    expect(cards[1].textContent).toContain('Offline');
+    expect(cards[1].querySelector('.tnl-status-chip')?.getAttribute('aria-label')).toBe('active: Heartbeat missing');
+    expect(cards[2].textContent).toContain('Inactive sensor');
+    expect(cards[2].textContent).toContain('inactive');
+    expect(cards[2].textContent).toContain('Inactive');
+    expect(cards[2].textContent).toContain('2 heartbeat failures');
+    expect(cards[2].querySelector('.tnl-connection-status')?.getAttribute('aria-label')).toContain('Heartbeat: Failed');
+    expect(cards[3].textContent).toContain('Suspended gateway');
+    expect(cards[3].textContent).toContain('suspended');
+    expect(cards[3].textContent).toContain('Access blocked');
+    expect(cards[3].textContent).toContain('No heartbeat received');
+    expect(cards[4].textContent).toContain('Revoked kiosk');
+    expect(cards[4].textContent).toContain('revoked');
+    expect(cards[4].textContent).toContain('Access revoked');
+    expect(cards[4].textContent).toContain('Revoked');
+
+    expect(cards[4].querySelector('select')?.disabled).toBe(true);
+    expect(cards[4].querySelector('button')?.disabled).toBe(true);
+  });
+
   it('returns status tones and heartbeat copy for non-happy states', () => {
     const component = fixture.componentInstance;
 
     expect(component.statusTone(buildDevice({ status: 'suspended', online: false }))).toBe('error');
     expect(component.statusTone(buildDevice({ status: 'active', online: false }))).toBe('warning');
     expect(component.statusTone(buildDevice({ status: 'inactive', online: false }))).toBe('neutral');
+    expect(component.deviceStateText(buildDevice({ status: 'active', online: false }))).toBe('Heartbeat missing');
+    expect(component.deviceStateText(buildDevice({ status: 'inactive', online: false }))).toBe('Inactive');
+    expect(component.deviceStateText(buildDevice({ status: 'suspended', online: false }))).toBe('Access blocked');
+    expect(component.deviceStateText(buildDevice({ status: 'revoked', online: false }))).toBe('Access revoked');
+    expect(component.heartbeatConnectionState(buildDevice({ online: true }))).toBe('connected');
+    expect(component.heartbeatConnectionState(buildDevice({ online: false }))).toBe('disconnected');
+    expect(component.heartbeatConnectionState(buildDevice({ online: false, lastSeenAt: null }))).toBe('failed');
     expect(component.heartbeatText(buildDevice({ lastSeenAt: null, online: false }))).toBe('No heartbeat received');
+    expect(component.heartbeatDetail(buildDevice({ online: false, heartbeatFailureCount: 3 }))).toContain('3 heartbeat failures');
     expect(component.heartbeatText(buildDevice({ revokedAt: now, online: false }))).toContain('Revoked');
     expect(component.trackById(0, buildDevice())).toBe('550e8400-e29b-41d4-a716-446655440000');
   });

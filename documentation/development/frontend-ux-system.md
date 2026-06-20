@@ -33,6 +33,19 @@ flowchart TD
 - Keep animations in reusable triggers, and honor `prefers-reduced-motion`.
 - Do not let browser-only badges, scores, or animations become a source of truth. They must derive from API, permission, or ledger state.
 
+## Dashboard Density And State Tokens
+
+Feature dashboards should use the shared MD3 token layer before adding page-specific CSS:
+
+- Use `--tnl-space-*` for spacing and keep repeated dashboard groups on `var(--tnl-space-3)` or `var(--tnl-space-4)` gaps.
+- Use `--tnl-radius-md` for cards, panels, controls, and compact action containers.
+- Use `--tnl-border-subtle`, `--tnl-elevation-1`, and `--tnl-elevation-2` for surface separation instead of custom shadows or borders.
+- Use `--tnl-color-surface-container-*` for dashboard surfaces and `--tnl-color-on-surface*` for text.
+- Use `--tnl-color-primary`, `--tnl-color-secondary`, `--tnl-color-tertiary`, and `--tnl-color-error` only when the visual state is also named in text or an accessible label.
+- Prefer dense, scannable operational layouts over decorative hero/card-heavy layouts for auth, devices, orders, inventory, and live operations pages.
+- Keep long-running workflow states explicit with disabled controls, `aria-busy`, `role="status"`, and stable status text.
+- Keep score, badge, seal, and progress visuals derived from API, permission, WebSocket, or ledger state.
+
 ## Shared UX Components
 
 Prioritize these components across PI-1:

@@ -108,6 +108,74 @@ test('login page authenticates and redirects to dashboard', async ({ page }) => 
   await expect(page.evaluate(() => localStorage.getItem('tnl.refreshToken'))).resolves.toBe('test-refresh-token');
 });
 
+test('smoke journey logs in and reaches devices, orders, and inventory', async ({ page }) => {
+  await page.route('**/api/v1/auth/login', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        accessToken: 'smoke-access-token',
+        refreshToken: 'smoke-refresh-token',
+        user: {
+          userId: 'smoke-admin',
+          username: 'smoke-admin',
+          actorType: 'user',
+          tenantId: '00000000-0000-0000-0000-000000000000',
+          permissions: ['ledger.read', 'devices.read', 'orders.read', 'inventory.read'],
+        },
+      }),
+    });
+  });
+  await page.route('**/api/v1/devices**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ devices: [], total: 0, page: 1, pageSize: 5 }),
+    });
+  });
+  await page.route('**/api/v1/orders**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ orders: [], total: 0, page: 1, pageSize: 20 }),
+    });
+  });
+  await page.route('**/api/v1/inventory**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], total: 0, page: 1, pageSize: 10 }),
+    });
+  });
+
+  await page.goto('/login');
+  await submitLogin(page, 'smoke-admin', 'admin');
+
+  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
+
+  const navigateByShellLink = async (name: string, urlPattern: RegExp): Promise<void> => {
+    await Promise.all([
+      page.waitForURL(urlPattern),
+      page.getByTestId('app-nav').getByRole('link', { name }).click(),
+    ]);
+  };
+
+  await navigateByShellLink('Devices', /\/devices$/);
+  await expect(page.getByRole('heading', { name: 'Devices', exact: true })).toBeVisible();
+
+  await navigateByShellLink('Orders', /\/orders$/);
+  await expect(page.getByRole('heading', { name: 'Orders', exact: true })).toBeVisible();
+
+  await navigateByShellLink('Inventory', /\/inventory$/);
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible();
+});
+
 test('disables the login button while authentication is pending', async ({ page }) => {
   let completeLogin!: () => void;
   const loginPending = new Promise<void>((resolve) => {
@@ -418,6 +486,17 @@ test('hides protected navigation items for unauthenticated users', async ({ page
   await expect(page.locator('nav[data-testid="app-nav"] a', { hasText: 'Settings' })).toHaveCount(0);
 });
 
+test('login shell remains readable without horizontal viewport overflow on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/login');
+
+  await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible();
+  await expect(page.getByTestId('forgot-password-placeholder')).toContainText('Coming in PI-2.');
+  await expect(page.locator('nav[data-testid="app-nav"] a', { hasText: 'Login' })).toBeVisible();
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
 test('shows tablet navigation and hides mobile navigation when user has devices permission only', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('tnl.authToken', 'test-access-token');
@@ -675,6 +754,7 @@ test('allows planned role route for users with roles permission and renders plac
 
 test('enforces planned route permission metadata matrix across web, tablet, and mobile surfaces', async ({ page }) => {
   const plannedRoutes: Array<{ path: string; expectedHeading: string }> = [
+    { path: '/devices', expectedHeading: 'Devices' },
     { path: '/orders', expectedHeading: 'Orders' },
     { path: '/inventory', expectedHeading: 'Inventory' },
     { path: '/shipping', expectedHeading: 'Shipping' },
@@ -702,6 +782,13 @@ test('enforces planned route permission metadata matrix across web, tablet, and 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ orders: [], total: 0, page: 1, pageSize: 20 }),
+    });
+  });
+  await page.route('**/api/v1/devices**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ devices: [], total: 0, page: 1, pageSize: 5 }),
     });
   });
   await page.route('**/api/v1/inventory**', async (route) => {
@@ -747,6 +834,7 @@ test('enforces planned route permission metadata matrix across web, tablet, and 
 
 test('denies planned routes for users missing route metadata permissions across all surfaces', async ({ page }) => {
   const plannedPaths = [
+    '/devices',
     '/orders',
     '/inventory',
     '/shipping',

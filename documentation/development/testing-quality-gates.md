@@ -4,16 +4,28 @@ Security, auditability, and quality need layered tests. Playwright should enforc
 
 ## Current Quality Metrics
 
-Coverage percentages are not currently enforced by tool configuration. Sprint 1 local closeout on 2026-06-04 used the command baseline below plus `pnpm nx run-many -t test --coverage --skip-nx-cache`.
+Coverage percentages are not currently enforced by tool configuration. The current Sprint 4.5 bridge baseline is command-driven:
 
-Current `ledger-web` coverage from the 2026-06-04 local closeout run:
+- `pnpm nx run-many --target=lint --all --skip-nx-cache --parallel=3`
+- `pnpm nx run-many --target=test --all --skip-nx-cache --parallel=3`
+- `pnpm nx e2e ledger-web-e2e --skip-nx-cache -- --workers=1 --reporter=line`
+- `pnpm nx run-many --target=build --all --skip-nx-cache --parallel=3`
+- `git diff --check`
+
+Current expected local results after Sprint 4.5 hardening:
+
+- `ledger-api`: 39 suites / 248 Jest tests passing.
+- `ledger-web`: 37 files / 232 Vitest tests passing.
+- `ledger-web-e2e`: full Playwright matrix passing across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari.
+
+Historical `ledger-web` coverage from the 2026-06-04 Sprint 1 local closeout run:
 
 - Statements: 91.41%
 - Branches: 83.92%
 - Functions: 96.41%
 - Lines: 92.99%
 
-Branch coverage remains below 90% because Angular template/compiler branches and placeholder page templates are included in aggregate reporting. Treat statements/functions/lines plus behavior coverage as the Sprint 1 practical gate until explicit branch thresholds or new-code-only coverage reporting are added.
+Branch coverage was below 90% because Angular template/compiler branches and placeholder page templates were included in aggregate reporting. Treat statements/functions/lines plus behavior coverage as the practical gate until explicit branch thresholds or new-code-only coverage reporting are added.
 
 **Test Suites:**
 - `ledger-api`: Jest unit/integration suites

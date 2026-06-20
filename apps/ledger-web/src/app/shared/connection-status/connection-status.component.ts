@@ -13,7 +13,12 @@ const STATE_TEXT: Record<ConnectionStatusState, string> = {
   selector: 'tnl-connection-status',
   standalone: false,
   template: `
-    <span class="tnl-connection-status" [class]="'tnl-connection-status--' + state" [attr.aria-label]="ariaLabel">
+    <span
+      class="tnl-connection-status"
+      data-testid="connection-status"
+      [class]="'tnl-connection-status--' + state"
+      [attr.aria-label]="ariaLabel"
+    >
       <span class="tnl-connection-status__mark" aria-hidden="true"></span>
       <span class="tnl-connection-status__label">{{ label }}</span>
       <span class="tnl-connection-status__state">{{ stateText }}</span>

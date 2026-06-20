@@ -52,7 +52,7 @@ Why it exists:
 
 This repository is an Nx workspace using pnpm.
 
-**Current Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, Sprint 2 device management, Sprint 3 order management, and Sprint 4 inventory management are implemented and pushed. Sprint 5 real-time notifications and production hardening remain planned PI-1 work.
+**Current Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, Sprint 2 device management, Sprint 3 order management, Sprint 4 inventory management, and Sprint 4.5 cross-sprint hardening are implemented. Sprint 5 real-time notifications and production hardening remain planned PI-1 work.
 
 Implemented now:
 
@@ -73,6 +73,7 @@ Implemented now:
 - Frontend unit tests passing
 - E2E Playwright suites passing across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
 - Lint/build/audit: passing cleanly
+- Sprint 4.5 added regression coverage for permission states, visual primitives, responsive layouts, reduced-motion states, audit metadata consistency, tenant isolation, and retry/idempotency paths
 
 **Remaining Product Gaps:**
 1. Real-time WebSocket notifications and external push/email notification transports remain Sprint 5 work.
@@ -397,6 +398,7 @@ All planning documents are located in the [`planning/`](planning/) folder:
   - [Sprint 2 Tasks](planning/SPRINT-2-TASKS.md) - Device Management & Identity
   - [Sprint 3 Tasks](planning/SPRINT-3-TASKS.md) - Orders Module & Ledger Integration
   - [Sprint 4 Tasks](planning/SPRINT-4-TASKS.md) - Inventory Module & Provenance
+  - [Sprint 4.5 Tasks](planning/SPRINT-4-5-TASKS.md) - Cross-Sprint Hardening & UI Cleanup
   - [Sprint 5 Tasks](planning/SPRINT-5-TASKS.md) - WebSocket Notifications & Production
 
 - **[Current State Assessment](planning/CURRENT-STATE.md)** - What's done vs. what's planned

@@ -12,7 +12,12 @@ const STATE_TEXT: Record<TrustSealState, string> = {
   selector: 'tnl-trust-seal',
   standalone: false,
   template: `
-    <span class="tnl-trust-seal" [class]="'tnl-trust-seal--' + state" [attr.aria-label]="ariaLabel">
+    <span
+      class="tnl-trust-seal"
+      data-testid="trust-seal"
+      [class]="'tnl-trust-seal--' + state"
+      [attr.aria-label]="ariaLabel"
+    >
       <span class="tnl-trust-seal__icon" aria-hidden="true">{{ icon }}</span>
       <span class="tnl-trust-seal__content">
         <span class="tnl-trust-seal__label">{{ label }}</span>

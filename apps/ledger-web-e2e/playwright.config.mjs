@@ -10,7 +10,8 @@ const filename = fileURLToPath(import.meta.url);
 loadEnv({ path: join(workspaceRoot, '.env.development'), quiet: true });
 
 const baseURL = process.env.BASE_URL || 'http://localhost:4200';
-const readinessURL = `${baseURL.replace(/\/$/, '')}/api`;
+const apiURL = process.env.API_URL || 'http://localhost:3000';
+const readinessURL = `${apiURL.replace(/\/$/, '')}/api`;
 
 export default defineConfig({
   ...nxE2EPreset(filename, { testDir: './src' }),
