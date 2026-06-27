@@ -1,8 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, Subject, throwError } from 'rxjs';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import type { InventoryItem } from '@true-north-ledger/inventory-contracts';
+import type { LedgerEventResponse } from '@true-north-ledger/shared-models';
 import { InventoryService } from '../../inventory.service';
+import {
+  type LedgerNotification,
+  type NotificationConnectionState,
+  NotificationService,
+} from '../../notification.service';
 import { InventoryComponent } from './inventory.component';
 import { InventoryModule } from './inventory.module';
 
@@ -52,6 +58,12 @@ describe('InventoryComponent', () => {
   let detectAnomaliesMock: ReturnType<typeof vi.fn>;
   let alertsMock: ReturnType<typeof vi.fn>;
   let generateAlertsMock: ReturnType<typeof vi.fn>;
+  let notificationState$: BehaviorSubject<NotificationConnectionState>;
+  let notifications$: Subject<LedgerNotification>;
+  let notificationConnectMock: ReturnType<typeof vi.fn>;
+  let notificationDisconnectMock: ReturnType<typeof vi.fn>;
+  let notificationSubscribeMock: ReturnType<typeof vi.fn>;
+  let notificationUnsubscribeMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     listMock = vi.fn(() => of({ items: [item], total: 1, page: 1, pageSize: 10 }));
@@ -183,6 +195,20 @@ describe('InventoryComponent', () => {
     };
     alertsMock = vi.fn(() => of({ alerts: [alert], total: 1 }));
     generateAlertsMock = vi.fn(() => of({ alerts: [alert], total: 1 }));
+    notificationState$ = new BehaviorSubject<NotificationConnectionState>('connected');
+    notifications$ = new Subject<LedgerNotification>();
+    notificationConnectMock = vi.fn();
+    notificationDisconnectMock = vi.fn();
+    notificationSubscribeMock = vi.fn(() => of({
+      subscribed: true,
+      rooms: [`tenant:${item.tenantId}:subject_type:inventory`],
+      timestamp: item.updatedAt,
+    }));
+    notificationUnsubscribeMock = vi.fn(() => of({
+      subscribed: false,
+      rooms: [],
+      timestamp: item.updatedAt,
+    }));
     await TestBed.configureTestingModule({
       imports: [InventoryModule],
       providers: [
@@ -208,6 +234,17 @@ describe('InventoryComponent', () => {
           getAlerts: alertsMock,
           generateAlerts: generateAlertsMock,
         } },
+        {
+          provide: NotificationService,
+          useValue: {
+            connect: notificationConnectMock,
+            disconnect: notificationDisconnectMock,
+            subscribe: notificationSubscribeMock,
+            unsubscribe: notificationUnsubscribeMock,
+            connectionState$: notificationState$,
+            notifications$,
+          },
+        },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(InventoryComponent);
@@ -509,6 +546,28 @@ describe('InventoryComponent', () => {
     expect(component.error).toContain('SKU or serial number');
   });
 
+  it('subscribes to live inventory scan events and refreshes counts when scans arrive', () => {
+    const scannedAt = '2026-06-12T05:00:00.000Z';
+    listMock.mockReturnValue(of({
+      items: [{ ...item, lastScannedAt: scannedAt }],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+    }));
+
+    notifications$.next(buildInventoryScanNotification(scannedAt));
+    fixture.detectChanges();
+
+    expect(notificationConnectMock).toHaveBeenCalledOnce();
+    expect(notificationSubscribeMock).toHaveBeenCalledWith({ subjectType: 'inventory' });
+    expect(listMock).toHaveBeenCalledTimes(2);
+    expect(component.liveScanCount).toBe(1);
+    expect(component.lastLiveScanSubjectId).toBe(item.id);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="inventory-live-scan-status"]')?.textContent)
+      .toContain('1 live inventory scan received this session');
+    expect(component.items[0]?.lastScannedAt).toBe(scannedAt);
+  });
+
   it('uses camera scan detection when the browser supports barcode detection', async () => {
     const detect = vi.fn().mockResolvedValue([{ rawValue: ' SKU-CAMERA ' }]);
     class MockBarcodeDetector {
@@ -760,3 +819,38 @@ describe('InventoryComponent', () => {
     expect(detectAnomaliesMock).toHaveBeenCalled();
   });
 });
+
+function buildInventoryScanNotification(scannedAt: string): LedgerNotification {
+  const ledgerEvent: LedgerEventResponse = {
+    id: '99999999-9999-4999-8999-999999999999',
+    type: 'LEDGER_EVENT',
+    subjectType: 'inventory',
+    subjectId: item.id,
+    actorType: 'user',
+    actorId: 'inventory-admin',
+    payload: {
+      action: 'INVENTORY_SCANNED',
+      scanType: 'barcode',
+      scanValue: item.sku,
+      accepted: true,
+    },
+    metadata: {
+      tenantId: item.tenantId,
+      requestId: 'inventory-live-scan-test',
+      payloadHash: 'payload-hash-live-scan',
+      eventHash: 'event-hash-live-scan',
+      chainSequence: 2,
+      result: 'accepted',
+      timestamp: scannedAt,
+    },
+    createdAt: scannedAt,
+  };
+
+  return {
+    event: 'LEDGER_EVENT_CREATED',
+    priority: 'normal',
+    category: 'ledger',
+    ledgerEvent,
+    occurredAt: scannedAt,
+  };
+}

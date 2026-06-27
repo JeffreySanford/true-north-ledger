@@ -20,12 +20,14 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
   ApiTags,
   ApiTooManyRequestsResponse,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import {
@@ -76,6 +78,7 @@ interface AuthenticatedRequest {
 
 @ApiTags('Inventory')
 @ApiBearerAuth('jwt')
+@ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
 @Controller('v1/inventory')
 @UseGuards(TokenAuthGuard, TenantGuard, PermissionsGuard)
 export class InventoryController {
@@ -144,6 +147,20 @@ export class InventoryController {
   @RateLimit({ maxRequests: 10, windowMs: 60_000 })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Import multiple inventory items and return per-item results' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['items'],
+      properties: {
+        items: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 100,
+          items: { type: 'object', example: CreateInventoryItemRequestExample },
+        },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Inventory import completed with per-item results.' })
   @ApiBadRequestResponse({ description: 'Import request validation failed.' })
   @ApiForbiddenResponse({ description: 'Caller lacks inventory.write permission.' })
@@ -232,6 +249,7 @@ export class InventoryController {
   @ApiOperation({ summary: 'Get one tenant-scoped inventory item by SKU' })
   @ApiParam({ name: 'sku', description: 'Tenant-scoped inventory SKU.' })
   @ApiOkResponse({ schema: { example: InventoryItemExample } })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   @ApiForbiddenResponse({ description: 'Caller lacks inventory.read permission.' })
   getBySku(
     @Param('sku') sku: string,
@@ -243,7 +261,9 @@ export class InventoryController {
   @Get(':id/provenance')
   @RequirePermissions('inventory.read')
   @ApiOperation({ summary: 'Get the complete tenant-scoped inventory ledger provenance timeline' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
   @ApiOkResponse({ description: 'Inventory item and chronological provenance events.' })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   @ApiForbiddenResponse({ description: 'Caller lacks inventory.read permission.' })
   provenance(
     @Param('id') id: string,
@@ -258,6 +278,7 @@ export class InventoryController {
   @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
   @ApiQuery({ name: 'includeProvenance', required: false, type: Boolean, description: 'Return the item with its provenance timeline when true.' })
   @ApiOkResponse({ schema: { example: InventoryItemExample } })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   @ApiForbiddenResponse({ description: 'Caller lacks inventory.read permission.' })
   getById(
     @Param('id') id: string,
@@ -273,9 +294,22 @@ export class InventoryController {
   @Patch(':id/reserve')
   @RequirePermissions('inventory.write')
   @ApiOperation({ summary: 'Reserve available inventory and optionally link it to an order' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['quantity'],
+      properties: {
+        quantity: { type: 'number', minimum: 1, example: 2 },
+        orderId: { type: 'string', format: 'uuid' },
+        reservationExpiresAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Inventory reserved.' })
   @ApiBadRequestResponse({ description: 'Reservation quantity exceeds available quantity.' })
   @ApiConflictResponse({ description: 'Inventory cannot be reserved.' })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   reserve(
     @Param('id') id: string,
     @Body() body: unknown,
@@ -289,8 +323,18 @@ export class InventoryController {
   @Patch(':id/release')
   @RequirePermissions('inventory.write')
   @ApiOperation({ summary: 'Release an active inventory reservation' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        reason: { type: 'string', example: 'Order cancelled before fulfillment' },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Inventory reservation released.' })
   @ApiConflictResponse({ description: 'Inventory does not have an active reservation.' })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   release(
     @Param('id') id: string,
     @Body() body: unknown,
@@ -314,9 +358,21 @@ export class InventoryController {
   @Patch(':id/move')
   @RequirePermissions('inventory.write')
   @ApiOperation({ summary: 'Move inventory to a new location and record provenance' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['locationId'],
+      properties: {
+        locationId: { type: 'string', example: 'AUSTIN-B2' },
+        reason: { type: 'string', example: 'Cycle count relocation' },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Inventory moved.' })
   @ApiBadRequestResponse({ description: 'Move request validation failed.' })
   @ApiConflictResponse({ description: 'Inventory cannot be moved.' })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   move(
     @Param('id') id: string,
     @Body() body: unknown,
@@ -331,6 +387,28 @@ export class InventoryController {
   @RequirePermissions('inventory.write')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Move multiple inventory items and return per-item results' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['moves'],
+      properties: {
+        moves: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 100,
+          items: {
+            type: 'object',
+            required: ['id', 'locationId'],
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              locationId: { type: 'string', example: 'AUSTIN-B2' },
+              reason: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Bulk inventory movement completed with per-item results.' })
   @ApiBadRequestResponse({ description: 'Bulk move request validation failed.' })
   bulkMove(
@@ -345,9 +423,21 @@ export class InventoryController {
   @Patch(':id/quantity')
   @RequirePermissions('inventory.write')
   @ApiOperation({ summary: 'Adjust inventory quantity and record provenance' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['quantity'],
+      properties: {
+        quantity: { type: 'number', example: 25 },
+        reason: { type: 'string', example: 'Cycle count correction' },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Inventory quantity adjusted.' })
   @ApiBadRequestResponse({ description: 'Quantity adjustment request validation failed.' })
   @ApiConflictResponse({ description: 'Inventory quantity cannot be adjusted.' })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   adjustQuantity(
     @Param('id') id: string,
     @Body() body: unknown,
@@ -361,9 +451,21 @@ export class InventoryController {
   @Patch(':id/status')
   @RequirePermissions('inventory.write')
   @ApiOperation({ summary: 'Change active inventory status and record provenance' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['status'],
+      properties: {
+        status: { type: 'string', enum: InventoryStatusSchema.options },
+        reason: { type: 'string', example: 'Quality hold' },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Inventory status changed.' })
   @ApiBadRequestResponse({ description: 'Status change request validation failed.' })
   @ApiConflictResponse({ description: 'Inventory status cannot be changed through this endpoint.' })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   changeStatus(
     @Param('id') id: string,
     @Body() body: unknown,
@@ -377,9 +479,20 @@ export class InventoryController {
   @Delete(':id')
   @RequirePermissions('inventory.write')
   @ApiOperation({ summary: 'Soft-remove inventory while preserving its audit trail' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'Inventory item ID.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['reason'],
+      properties: {
+        reason: { type: 'string', example: 'Damaged item removed from active stock' },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Inventory soft-removed.' })
   @ApiBadRequestResponse({ description: 'Removal reason is required.' })
   @ApiConflictResponse({ description: 'Inventory cannot be removed.' })
+  @ApiNotFoundResponse({ description: 'Inventory item not found for tenant.' })
   remove(
     @Param('id') id: string,
     @Body() body: unknown,

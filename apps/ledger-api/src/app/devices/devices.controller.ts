@@ -24,6 +24,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiSecurity,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -65,6 +66,7 @@ interface AuthenticatedRequest {
 }
 
 @ApiTags('Devices')
+@ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token or device key.' })
 @Controller('v1/devices')
 export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}
@@ -238,6 +240,7 @@ export class DevicesController {
   @RateLimit({ maxRequests: 1, windowMs: 60_000 })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Record a heartbeat from a device using the X-Device-Key header' })
+  @ApiSecurity('device-key')
   @ApiHeader({ name: 'X-Device-Key', required: true, description: 'Raw device API key returned at registration.' })
   @ApiBody({
     schema: {

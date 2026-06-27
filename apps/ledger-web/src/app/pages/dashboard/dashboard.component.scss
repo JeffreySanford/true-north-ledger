@@ -34,3 +34,35 @@
   font-weight: 800;
   line-height: 1;
 }
+
+.dashboard-live-operations {
+  display: grid;
+  gap: var(--tnl-space-4);
+  margin: var(--tnl-space-5) 0;
+}
+
+.dashboard-live-operations__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tnl-space-3);
+  flex-wrap: wrap;
+}
+
+.dashboard-live-operations__header h2,
+.dashboard-live-operations p {
+  margin: 0;
+}
+
+.dashboard-live-operations__feed {
+  display: grid;
+  gap: var(--tnl-space-3);
+  min-width: 0;
+}
+
+.dashboard-live-operations__signals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--tnl-space-3);
+  min-width: 0;
+}

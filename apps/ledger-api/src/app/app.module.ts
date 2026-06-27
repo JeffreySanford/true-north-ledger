@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER } from '@nestjs/core';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
@@ -10,13 +9,16 @@ import { LedgerEventsModule } from './ledger-events/ledger-events.module';
 import { AuthModule } from './auth/auth.module';
 import { typeOrmConfig } from './typeorm.config';
 import { ApiErrorFilter } from './errors/api-error.filter';
-import { validateAuthEnv } from './config/auth-env.validation';
+import { validateRuntimeEnv } from './config/runtime-env.validation';
 import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { RedisThrottlerStorage } from './auth/redis-throttler.storage';
 import { DevicesModule } from './devices/devices.module';
 import { OrdersModule } from './orders/orders.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { HttpMetricsInterceptor } from './config/http-metrics.interceptor';
+import { MetricsModule } from './config/metrics.module';
 
 @Module({
   imports: [
@@ -60,10 +62,16 @@ import { InventoryModule } from './inventory/inventory.module';
     DevicesModule,
     OrdersModule,
     InventoryModule,
+    NotificationsModule,
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpMetricsInterceptor,
+    },
     {
       provide: APP_FILTER,
       useClass: ApiErrorFilter,
@@ -76,6 +84,6 @@ import { InventoryModule } from './inventory/inventory.module';
 })
 export class AppModule {
   constructor() {
-    validateAuthEnv();
+    validateRuntimeEnv();
   }
 }

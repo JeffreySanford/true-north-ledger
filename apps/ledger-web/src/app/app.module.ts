@@ -6,10 +6,11 @@ import { RouterModule } from '@angular/router';
 import { App } from './app';
 import { appRoutes } from './app.routes';
 import { authInterceptor } from './auth.interceptor';
+import { NotificationComponent } from './notification.component';
 import { VisualPrimitivesModule } from './shared/visual-primitives.module';
 
 @NgModule({
-  declarations: [App],
+  declarations: [App, NotificationComponent],
   imports: [
     BrowserModule,
     BrowserAnimationsModule,

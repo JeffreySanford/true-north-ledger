@@ -1,9 +1,10 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { randomUUID } from 'crypto';
 import type { InventoryItem } from '@true-north-ledger/inventory-contracts';
 
 const now = '2026-06-11T12:00:00.000Z';
 const tenantId = '11111111-1111-4111-8111-111111111111';
+const socketBaseUrl = (process.env.API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
 function buildItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
   return {
@@ -33,7 +34,11 @@ function buildItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
 }
 
 async function seedSession(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+  await page.addInitScript((apiUrl) => {
+    window.localStorage.setItem('tnl.socketBaseUrl', apiUrl);
+    if (window.localStorage.getItem('tnl.authToken')) {
+      return;
+    }
     window.localStorage.setItem('tnl.disableAutoAuth', 'true');
     window.localStorage.setItem('tnl.authToken', 'inventory-token');
     window.localStorage.setItem(
@@ -43,10 +48,10 @@ async function seedSession(page: Page): Promise<void> {
         username: 'admin',
         actorType: 'user',
         tenantId: '11111111-1111-4111-8111-111111111111',
-        permissions: ['inventory.read', 'inventory.write'],
+        permissions: ['inventory.read', 'inventory.write', 'ledger.read'],
       }),
     );
-  });
+  }, socketBaseUrl);
 }
 
 function toast(page: Page) {
@@ -62,6 +67,56 @@ async function openRowActions(row: Locator): Promise<void> {
 }
 
 test.beforeEach(async ({ page }) => seedSession(page));
+
+test('inventory page updates live scan status from realtime inventory notifications', async ({ page, request }) => {
+  const session = await loginAsAdmin(request);
+  const sku = `LIVE-SCAN-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+  const createResponse = await request.post('/api/v1/inventory', {
+    headers: { Authorization: `Bearer ${session.accessToken}` },
+    data: {
+      sku,
+      name: 'Live scan sensor',
+      locationId: 'AUSTIN-LIVE',
+      locationName: 'Austin Live Scan Shelf',
+      quantity: 9,
+      unitOfMeasure: 'each',
+      serialNumber: `${sku}-SERIAL`,
+    },
+  });
+  expect(createResponse.status()).toBe(201);
+  const created = await createResponse.json() as InventoryItem;
+
+  await page.goto('/login');
+  await page.evaluate((authSession) => {
+    window.localStorage.setItem('tnl.authToken', authSession.accessToken);
+    window.localStorage.setItem('tnl.refreshToken', authSession.refreshToken);
+    window.localStorage.setItem('tnl.authUser', JSON.stringify(authSession.user));
+  }, session);
+  await page.goto('/inventory');
+  await expect(page.getByTestId('inventory-live-scan-status')).toContainText(
+    '0 live inventory scans received this session.',
+  );
+
+  await page.locator('.inventory-filters input[formcontrolname="query"]').fill(sku);
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByTestId('inventory-row').filter({ hasText: sku })).toBeVisible();
+
+  const scanResponse = await request.post('/api/v1/inventory/scan', {
+    headers: { Authorization: `Bearer ${session.accessToken}` },
+    data: {
+      value: sku,
+      scanType: 'barcode',
+      locationId: 'AUSTIN-LIVE',
+    },
+  });
+  expect(scanResponse.status()).toBe(200);
+
+  await expect(page.getByTestId('inventory-live-scan-status')).toContainText(
+    '1 live inventory scan received this session.',
+  );
+  await expect(page.getByTestId('inventory-live-scan-status')).toContainText(created.id);
+});
 
 test('inventory page lists, filters, and adds tenant inventory', async ({ page }) => {
   const items = [buildItem()];
@@ -247,11 +302,20 @@ test('inventory page locks bulk action controls while import is pending', async 
     name: 'Imported sensor one',
     quantity: 6,
   });
-  let releaseImport!: () => void;
+  let releaseImport: (() => void) | undefined;
+  let resolveImportStarted!: () => void;
+  const importStarted = new Promise<void>((resolve) => {
+    resolveImportStarted = resolve;
+  });
 
   await page.route('**/api/v1/inventory**', async (route) => {
     const request = route.request();
-    if (request.method() === 'POST' && request.url().endsWith('/import')) {
+    const url = new URL(request.url());
+    if (
+      request.method() === 'POST' &&
+      url.pathname.endsWith('/api/v1/inventory/import')
+    ) {
+      resolveImportStarted();
       await new Promise<void>((resolve) => {
         releaseImport = resolve;
       });
@@ -278,12 +342,13 @@ test('inventory page locks bulk action controls while import is pending', async 
     'sku-import-1,Imported sensor one,AUSTIN-A1,Austin Warehouse - Aisle A1,6,each',
   ].join('\n'));
   await form.getByRole('button', { name: 'Submit import' }).click();
+  await importStarted;
 
   await expect(form).toHaveAttribute('aria-busy', 'true');
   await expect(form.locator('fieldset')).toHaveAttribute('disabled', '');
   await expect(form.getByTestId('inventory-import-status')).toContainText('Importing inventory');
 
-  releaseImport();
+  releaseImport?.();
 
   await expect(page.getByTestId('inventory-success')).toContainText('1 of 1 inventory items imported.');
   await expect(form).toHaveAttribute('aria-busy', 'false');
@@ -1253,3 +1318,31 @@ test('inventory dashboard exposes health, recent scan, and quick action state', 
   await expect(dashboard.getByTestId('dashboard-recent-anomalies')).toContainText('critical SKU-LOW | quantity_discrepancy');
   await expect(dashboard.getByTestId('dashboard-recent-anomalies')).toContainText('warning SKU-LOW | low_stock');
 });
+
+async function loginAsAdmin(request: APIRequestContext): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  user: { tenantId: string };
+}> {
+  let lastStatus = 0;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await request.post('/api/v1/auth/login', {
+      data: { username: 'admin', password: 'admin' },
+    });
+    lastStatus = response.status();
+    if (response.ok()) {
+      return (await response.json()) as {
+        accessToken: string;
+        refreshToken: string;
+        user: { tenantId: string };
+      };
+    }
+    if (lastStatus !== 429) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1)));
+  }
+
+  throw new Error(`Admin login failed with status ${lastStatus}`);
+}

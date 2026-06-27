@@ -28,7 +28,7 @@
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "700kb",
+              "maximumWarning": "850kb",
               "maximumError": "1mb"
             },
               {
@@ -61,7 +61,7 @@
       "defaultConfiguration": "development",
       "dependsOn": ["ledger-api:serve"],
       "options": {
-        "proxyConfig": "apps/ledger-web/proxy.conf.json"
+        "proxyConfig": "apps/ledger-web/proxy.conf.cjs"
       }
     },
     "lint": {

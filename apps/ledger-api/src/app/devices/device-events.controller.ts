@@ -15,6 +15,7 @@ import {
   ApiConflictResponse,
   ApiHeader,
   ApiOperation,
+  ApiSecurity,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -58,6 +59,7 @@ export class DeviceEventsController {
   @RateLimit({ maxRequests: 120, windowMs: 60_000 })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Ingest one device event and append a device-scoped ledger event' })
+  @ApiSecurity('device-key')
   @ApiHeader({ name: 'X-Device-Key', required: true, description: 'Raw device API key returned at registration.' })
   @ApiBody({
     schema: {
@@ -108,6 +110,7 @@ export class DeviceEventsController {
   @RateLimit({ maxRequests: 60, windowMs: 60_000 })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Ingest a batch of device events and return per-item results' })
+  @ApiSecurity('device-key')
   @ApiHeader({ name: 'X-Device-Key', required: true, description: 'Raw device API key returned at registration.' })
   @ApiBody({
     schema: {
@@ -161,6 +164,8 @@ export class DeviceEventsController {
       },
     },
   })
+  @ApiBadRequestResponse({ description: 'Invalid batch payload, including event count or payload size limit violations.' })
+  @ApiUnauthorizedResponse({ description: 'Missing, invalid, revoked, or suspended device key.' })
   ingestBatch(
     @Body() body: DeviceBatchEventRequest,
     @Req() req: DeviceAuthenticatedRequest,

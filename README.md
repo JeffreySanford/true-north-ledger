@@ -52,13 +52,13 @@ Why it exists:
 
 This repository is an Nx workspace using pnpm.
 
-**Current Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, Sprint 2 device management, Sprint 3 order management, Sprint 4 inventory management, and Sprint 4.5 cross-sprint hardening are implemented. Sprint 5 real-time notifications and production hardening remain planned PI-1 work.
+**Current Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, Sprint 2 device management, Sprint 3 order management, Sprint 4 inventory management, and Sprint 4.5 cross-sprint hardening are implemented. Sprint 5 is open with production health/readiness/metrics endpoints implemented; real-time notifications, reverse proxy, full monitoring, and deployment hardening remain PI-1 work.
 
 Implemented now:
 
 - `apps/ledger-web` - Angular web application with routing, SCSS, Vitest, and Playwright
 - `apps/ledger-web-e2e` - Playwright e2e project with browser quality, login, permission, and full-stack JWT checks
-- `apps/ledger-api` - NestJS REST API with PostgreSQL persistence, authenticated ledger events, auth, devices, orders, inventory, and Swagger/OpenAPI docs
+- `apps/ledger-api` - NestJS REST API with PostgreSQL persistence, authenticated ledger events, auth, devices, orders, inventory, health/readiness/metrics endpoints, and Swagger/OpenAPI docs
 - `libs/shared-models` - Unified contract library exports
 - `libs/ledger-contracts` - Core Zod schemas for ledger events and metadata
 - `libs/auth-contracts` - Actor type and permission schemas  
@@ -74,10 +74,12 @@ Implemented now:
 - E2E Playwright suites passing across Chromium, Firefox, WebKit, Mobile Chrome, and Mobile Safari
 - Lint/build/audit: passing cleanly
 - Sprint 4.5 added regression coverage for permission states, visual primitives, responsive layouts, reduced-motion states, audit metadata consistency, tenant isolation, and retry/idempotency paths
+- Sprint 5 health/readiness/metrics unit coverage and focused e2e smoke coverage are added; the full Sprint 5 browser-matrix e2e closeout run is deferred to final closeout
+- Sprint 5 order realtime WebSocket hardening has started with authenticated connection tracking, disconnect cleanup, `ping`, `get_status`, and active connection metrics
 
 **Remaining Product Gaps:**
 1. Real-time WebSocket notifications and external push/email notification transports remain Sprint 5 work.
-2. Public proof pages, production monitoring, and production deployment hardening remain PI-1 roadmap work.
+2. Public proof pages, full production monitoring, reverse proxy, and production deployment hardening remain PI-1 roadmap work.
 3. Browser auth can move from storage-backed bearer tokens toward secure cookie sessions when API/client constraints allow.
 4. Inventory location registry validation and reservation timeout background scheduling remain future workflow infrastructure work.
 
@@ -200,6 +202,24 @@ Open API documentation after `pnpm start:all`:
 ```sh
 http://localhost:3000/api/docs
 ```
+
+## Production Deployment
+
+Production deployment uses the Docker Compose stack in `apps/docker/docker-compose.production.yml` with the scripts in `scripts/production`.
+
+- [Deployment](DEPLOYMENT.md) covers prerequisites, installation, configuration, start/stop commands, verification, and troubleshooting.
+- [Backup and Restore](BACKUP.md) covers PostgreSQL backups, guarded restores, and disaster recovery.
+- [Monitoring](MONITORING.md) covers Grafana access, Prometheus scraping, alert rules, dashboard panels, and metric definitions.
+
+The standard production flow is:
+
+```sh
+scripts/production/pre-deploy.sh
+scripts/production/build.sh
+scripts/production/deploy.sh
+```
+
+After deployment, verify `/api/health`, `/api/ready`, `/api/metrics`, `/api/docs`, Grafana, and Prometheus before opening traffic.
 
 ### Development Workflow
 
@@ -380,7 +400,7 @@ pnpm nx e2e ledger-web-e2e -- --grep "login|refresh|unauthorized|permission"
 
 ## Project Planning & Roadmap
 
-**Current Phase:** PI-1 / Sprint 5 next
+**Current Phase:** PI-1 / Sprint 5 open
 
 ### Planning Documents
 
@@ -413,8 +433,8 @@ By end of PI-1 (10 weeks), the platform is planned to have:
 - Device registration, authentication, and event ingestion - implemented
 - Orders module with full audit trail - implemented
 - Inventory tracking with device scan integration - implemented
-- Real-time WebSocket notifications - planned Sprint 5 work
-- Production infrastructure with monitoring
+- Real-time WebSocket notifications - open Sprint 5 work
+- Production infrastructure with monitoring - health/readiness/metrics foundation implemented; reverse proxy and full Prometheus/Grafana stack remain open
 - Public proof verification system
 - Shared visual system with reusable MD3 components, accessible animations, and E2E coverage for visual states
 - Expanded OpenAPI/Swagger documentation

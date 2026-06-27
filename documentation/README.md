@@ -15,6 +15,10 @@ Documentation is grouped by topic so project intent, platform design, operations
 ## Platform
 
 - [API Design](platform/api-design.md)
+- [API Changelog](platform/api-changelog.md)
+- [API Integration Guide](platform/api-integration-guide.md)
+- [API Troubleshooting](platform/api-troubleshooting.md)
+- [Auth API Reference](platform/auth-api-reference.md)
 - [Auditability Plan](platform/auditability-plan.md)
 - [Ledger Model](platform/ledger-model.md)
 - [Device Ingestion](platform/device-ingestion.md)
@@ -34,8 +38,14 @@ Documentation is grouped by topic so project intent, platform design, operations
 
 ## Operations
 
+- [Deployment](../DEPLOYMENT.md)
+- [Backup and Restore](../BACKUP.md)
+- [Monitoring](../MONITORING.md)
 - [Applications](operations/applications.md)
 - [Infrastructure](operations/infrastructure.md)
+- [Host Security](operations/host-security.md)
+- [Deployment Secrets](operations/deployment-secrets.md)
+- [Production Deployment](operations/production-deployment.md)
 
 ## Development
 
@@ -44,6 +54,7 @@ Documentation is grouped by topic so project intent, platform design, operations
 - [Getting Started with Authentication](development/getting-started-authentication.md)
 - [Frontend Login Flow Guide](development/frontend-login-flow.md)
 - [Frontend UX System](development/frontend-ux-system.md)
+- [Live Operations Visual State Model](development/live-operations-visual-state-model.md)
 - [Testing and Quality Gates](development/testing-quality-gates.md)
 
 ## Planning

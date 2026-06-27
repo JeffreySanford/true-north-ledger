@@ -4,6 +4,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { LedgerEventEntity } from './ledger-event.entity';
 import { LedgerEventsService } from './ledger-events.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { MetricsService } from '../config/metrics.service';
 
 describe('LedgerEventsService', () => {
   const tenantId = '00000000-0000-0000-0000-000000000000';
@@ -16,6 +18,8 @@ describe('LedgerEventsService', () => {
   let service: LedgerEventsService;
   let repository: jest.Mocked<Repository<LedgerEventEntity>>;
   let transactionalRepository: jest.Mocked<Repository<LedgerEventEntity>>;
+  let notificationsGateway: { emitLedgerEvent: jest.Mock };
+  let metricsService: { recordLedgerEventCreated: jest.Mock };
 
   function computeEventHash(entity: LedgerEventEntity): string {
     return (service as unknown as { computeEventHash(entity: LedgerEventEntity): string }).computeEventHash(
@@ -40,6 +44,8 @@ describe('LedgerEventsService', () => {
         ),
       },
     } as unknown as jest.Mocked<Repository<LedgerEventEntity>>;
+    notificationsGateway = { emitLedgerEvent: jest.fn() };
+    metricsService = { recordLedgerEventCreated: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +53,14 @@ describe('LedgerEventsService', () => {
         {
           provide: getRepositoryToken(LedgerEventEntity),
           useValue: repository,
+        },
+        {
+          provide: NotificationsGateway,
+          useValue: notificationsGateway,
+        },
+        {
+          provide: MetricsService,
+          useValue: metricsService,
         },
       ],
     }).compile();
@@ -160,6 +174,14 @@ describe('LedgerEventsService', () => {
           expect(result.metadata.payloadHash).toHaveLength(64);
           expect(result.metadata.userAgent).toBe('jest');
           expect(result.metadata.sourceIp).toBe('127.0.0.1');
+          expect(notificationsGateway.emitLedgerEvent).toHaveBeenCalledWith(
+            result,
+          );
+          expect(metricsService.recordLedgerEventCreated).toHaveBeenCalledWith({
+            eventType: 'LEDGER_EVENT',
+            subjectType: 'order',
+            result: 'accepted',
+          });
           done();
         },
         error: done,

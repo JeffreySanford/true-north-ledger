@@ -447,7 +447,7 @@ A task is considered complete when:
 Current completed slice:
 - Device registration, extracted registration component, formal device-key auth strategy, heartbeat, degraded-heartbeat failure tracking with auto-suspend, per-device route throttling, revocation, device event ingestion, batch device event ingestion, nonce replay protection, payload size validation, admin device registry UI, QR provisioning, clipboard verification, device filtering, server-backed pagination, registry-level status/revocation controls, device detail status/audit views, status-management confirmation and audit trail controls, ledger-events audit visibility, device event visibility from registration through ingestion to detail stream, shared-primitives device empty/loading/error states, hardware examples, integration docs, last-24-hours heartbeat history, and polling-backed live device status updates are implemented and locally verified.
 - Remaining Sprint 2 closeout still includes code review approval and development-environment deployment testing.
-- WebSocket transport remains a planned Sprint 5 upgrade; Sprint 2 uses polling-backed live status updates.
+- WebSocket transport hardening began in Sprint 5 through the order realtime gateway; Sprint 2 device status still uses polling-backed live status updates until generic notification subscriptions are complete.
 
 Local gate results:
 - [x] `pnpm nx run-many -t lint --skip-nx-cache` - 8 projects passed

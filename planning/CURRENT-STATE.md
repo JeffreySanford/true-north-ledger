@@ -3,13 +3,13 @@
 **Assessment Date:** 2026-06-20
 **Project:** True North Ledger  
 **Version:** 0.1.0 (PI-1 implementation in progress)
-**Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, Sprint 2 device management, Sprint 3 order management, Sprint 4 inventory management, and Sprint 4.5 cross-sprint hardening are implemented; Sprint 5 real-time notifications and production infrastructure remain planned
+**Status:** Sprint 0 remediation, Sprint 1 authentication/RBAC, Sprint 2 device management, Sprint 3 order management, Sprint 4 inventory management, and Sprint 4.5 cross-sprint hardening are implemented; Sprint 5 is open with production health/readiness/metrics endpoints implemented and real-time notifications/deployment infrastructure still in progress
 
 ---
 
 ## Executive Summary
 
-True North Ledger now has a **working PI-1 operational slice**: authenticated ledger endpoints, tenant isolation, permission checks, server-controlled audit metadata, audit chain fields/hashing, database chain constraints, rate limiting, formal error responses, Swagger/OpenAPI docs, auth/RBAC, device management, order management, inventory management, and Angular workflows for the implemented modules. Sprint 4.5 added cross-sprint hardening for permission states, visual primitives, responsive layouts, reduced-motion behavior, audit metadata consistency, tenant isolation, and retry/idempotency paths. The platform is still **NOT production-ready** because Sprint 5 real-time notifications, external notification transports, production monitoring, reverse proxy hardening, and deployment runbooks remain planned work.
+True North Ledger now has a **working PI-1 operational slice**: authenticated ledger endpoints, tenant isolation, permission checks, server-controlled audit metadata, audit chain fields/hashing, database chain constraints, rate limiting, formal error responses, Swagger/OpenAPI docs, auth/RBAC, device management, order management, inventory management, Angular workflows for the implemented modules, and Sprint 5 health/readiness/metrics endpoints. Sprint 4.5 added cross-sprint hardening for permission states, visual primitives, responsive layouts, reduced-motion behavior, audit metadata consistency, tenant isolation, and retry/idempotency paths. The platform is still **NOT production-ready** because Sprint 5 real-time notifications, external notification transports, full production monitoring, reverse proxy hardening, and deployment runbooks remain planned work.
 
 **Critical Findings:**
 - ✅ Ledger API now requires JWT authentication
@@ -23,18 +23,21 @@ True North Ledger now has a **working PI-1 operational slice**: authenticated le
 - ✅ Login/logout/session UX, permission-aware route guards, RBAC roles, user-role assignment, service tokens, and deactivation controls are implemented
 - ✅ Device management, order management, and inventory management are implemented with ledger-backed audit trails
 - ✅ Sprint 4.5 hardening coverage is implemented across API integration, Angular component/unit, and Playwright e2e suites
+- ✅ Sprint 5 health/readiness/metrics endpoints are implemented with unit coverage and focused Playwright e2e smoke coverage
+- ✅ Sprint 5 order realtime gateway hardening is started: authenticated connection tracking, disconnect cleanup, `ping`, `get_status`, and active WebSocket connection metrics are implemented
+- ⚠️ Full Sprint 5 browser-matrix e2e closeout is intentionally deferred to Sprint 5 final closeout
 - ⚠️ Real-time WebSocket notifications, external push/email transports, and production deployment infrastructure remain Sprint 5 scope
 
-**Next Phase:** Start PI-1/Sprint 5 real-time notifications and production infrastructure.
+**Next Phase:** Continue PI-1/Sprint 5 with generic notifications subscriptions, reverse proxy, production monitoring, and deployment runbooks.
 
 ---
 
 ## Critical Issues (BLOCKING)
 
 ### Security Issues 🚨
-1. **No Real-Time Transport Yet** - WebSocket notifications and live operations UI remain Sprint 5 work
+1. **Generic Notification Transport Still Pending** - Order realtime WebSocket transport exists and now exposes status/ping lifecycle checks; generic notification subscriptions and live operations UI remain Sprint 5 work
 2. **No External Notification Transports Yet** - Inventory alerts are visible in-app; push/email delivery remains Sprint 5 or later work
-3. **No Production Deployment Hardening** - Reverse proxy, TLS, monitoring, and deployment runbooks are pending
+3. **Production Deployment Hardening In Progress** - Health/readiness/metrics endpoints exist; reverse proxy, TLS, full monitoring, and deployment runbooks are pending
 4. **Future Workflow Infrastructure Pending** - Location registry validation and reservation timeout background scheduling depend on future registry/job-runner infrastructure
 5. **Public Proof Pages Pending** - Internal proof generation exists; public proof verification pages remain roadmap work
 
@@ -70,6 +73,7 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 - [x] Global validation pipes
 - [x] Error handling and logging
 - [x] Swagger/OpenAPI documentation exposed at `/api/docs` and `/api/docs-json`
+- [x] Health, readiness, and Prometheus-format metrics endpoints exposed at `/api/health`, `/api/ready`, and `/api/metrics`
 
 ### Contract Libraries ✅
 - [x] ledger-contracts - Core ledger event schemas
@@ -166,15 +170,14 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
   - No proof generation
   
 - [ ] **Real-time Updates**
-  - No WebSocket server
-  - No live notifications
-  - No event streaming
+  - Order realtime WebSocket transport exists with authenticated tenant-scoped updates, connection tracking, `ping`, and `get_status`
+  - Generic notifications gateway, live operations UI, and cross-domain event streaming remain pending
   
 - [ ] **Production Infrastructure**
   - No Nginx reverse proxy
   - No SSL/TLS configuration
   - No monitoring (Prometheus/Grafana)
-  - No health/readiness endpoints beyond the basic API root
+  - Baseline health/readiness/metrics endpoints exist; full Prometheus/Grafana infrastructure remains pending
   - No production deployment docs
 
 ### Medium Priority Gaps 🟡
@@ -449,14 +452,14 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 ## Next Steps
 
 ### Immediate (Sprint 5 Start)
-1. Confirm Socket.IO vs native WebSocket decision and document the transport choice.
-2. Start the notifications gateway, authenticated subscription model, and tenant-isolated room strategy.
+1. Confirm whether the existing Socket.IO order gateway becomes the generic notification transport or whether a separate `/ws` namespace is still required.
+2. Start the generic notifications subscription model and tenant-isolated room strategy.
 3. Add live operations UI wiring for connection state, event feed highlights, readiness score, and demo mode using shared primitives.
-4. Begin production infrastructure work for health/readiness endpoints, reverse proxy, metrics, and deployment documentation.
+4. Continue production infrastructure work for reverse proxy, full metrics integration, and deployment documentation.
 5. Keep deferred inventory alert transport, reservation scheduling, and location registry tests linked to the Sprint 5 or later infrastructure that enables them.
 
 ### Sprint 5 Closeout
-1. Run full lint, unit/integration, build, and Playwright gates.
+1. Run full lint, unit/integration, build, and Playwright gates, including the deferred full browser-matrix e2e closeout.
 2. Verify WebSocket connection, subscription, reconnection, tenant isolation, and live UI states.
 3. Verify production docs, environment guidance, monitoring setup, and deployment runbooks.
 4. Update README, current-state, and Sprint 5 task status with final verification commands.
@@ -476,6 +479,8 @@ See [SPRINT-0-REMEDIATION.md](SPRINT-0-REMEDIATION.md) for detailed remediation 
 | 2026-06-03 | Added PI-1 visual/UX planning | Shared MD3 styles, reusable UX primitives, animation budget, gamification guidance, and visual E2E gates documented |
 | 2026-06-04 | Sprint 1 local closeout gates passed | Lint, unit/integration tests with coverage, build, dependency audit, full Playwright E2E, Docker infrastructure, and local development smoke tests pass |
 | 2026-06-20 | Sprint 4.5 bridge hardening completed | Cross-sprint permission, visual, responsive, reduced-motion, audit consistency, tenant isolation, retry/idempotency, and documentation hardening completed |
+| 2026-06-20 | Sprint 5 opened with production health endpoints | `/api/health`, `/api/ready`, and `/api/metrics` now expose service/dependency readiness and baseline Prometheus metrics with unit and e2e coverage |
+| 2026-06-20 | Sprint 5 order realtime gateway hardening | Existing `/orders` Socket.IO gateway now tracks authenticated connections, cleans up disconnects, responds to `ping`/`get_status`, and feeds active connection metrics |
 | Complete | Full auth implementation (Sprint 1) | Login/session UX, RBAC/user administration, service tokens, permission-aware navigation, and route gating are product-ready for current workflows |
 | Complete | Device management (Sprint 2) | Devices have identity, authenticated ingestion, status management, and audit visibility |
 | Complete | Orders module (Sprint 3) | Core order workflow, lifecycle transitions, proof states, and audit trail are implemented |
@@ -522,7 +527,10 @@ docker exec -it true-north-ledger-db psql -U ledger_user -d ledger_dev
 - `/.env.production` - Production environment config (not in git)
 
 ### Key Endpoints (Current)
-- `GET /api` - API health check
+- `GET /api` - Basic API compatibility response
+- `GET /api/health` - Service health and dependency status
+- `GET /api/ready` - Orchestrator readiness check
+- `GET /api/metrics` - Prometheus-format baseline metrics
 - `POST /api/v1/auth/login` - Authenticate a user and issue tokens
 - `POST /api/v1/auth/refresh` - Refresh an access token
 - `POST /api/v1/auth/logout` - End a refresh-token session

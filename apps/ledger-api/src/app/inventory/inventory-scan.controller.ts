@@ -7,6 +7,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiSecurity,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -45,7 +46,29 @@ export class InventoryScanController {
   @RateLimit({ maxRequests: 30, windowMs: 60_000 })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Scan up to 100 tenant inventory items and return per-item results' })
+  @ApiSecurity('device-key')
   @ApiHeader({ name: 'X-Device-Key', required: false, description: 'Device API key; bearer auth may also be used.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['items'],
+      properties: {
+        items: {
+          type: 'array',
+          maxItems: 100,
+          items: {
+            type: 'object',
+            required: ['value', 'scanType'],
+            properties: {
+              value: { type: 'string', example: 'SKU-100' },
+              scanType: { type: 'string', enum: InventoryScanTypeSchema.options },
+              locationId: { type: 'string', example: 'AUSTIN-A1' },
+            },
+          },
+        },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Batch inventory scan completed with per-item results.' })
   @ApiBadRequestResponse({ description: 'Invalid batch scan payload.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token or device key.' })
@@ -60,6 +83,7 @@ export class InventoryScanController {
   @RateLimit({ maxRequests: 120, windowMs: 60_000 })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Scan tenant inventory by SKU or serial number and record provenance' })
+  @ApiSecurity('device-key')
   @ApiHeader({ name: 'X-Device-Key', required: false, description: 'Device API key; bearer auth may also be used.' })
   @ApiBody({
     schema: {

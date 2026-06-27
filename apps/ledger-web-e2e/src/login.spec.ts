@@ -5,9 +5,50 @@ import {
   type AuthLedgerEventAction as AuthLedgerEventActionType,
 } from '@true-north-ledger/ledger-contracts';
 
+const socketBaseUrl = (process.env.API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
+  await page.addInitScript((apiUrl) => {
     window.localStorage.setItem('tnl.disableAutoAuth', 'true');
+    window.localStorage.setItem('tnl.socketBaseUrl', apiUrl);
+  }, socketBaseUrl);
+  await page.route('**/api/metrics', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/plain',
+      body: 'true_north_ledger_websocket_connections_active 0\n',
+    });
+  });
+  await page.route('**/api/v1/inventory/anomalies**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ anomalies: [], total: 0, page: 1, pageSize: 20 }),
+    });
+  });
+  await page.route('**/api/v1/devices**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ devices: [], total: 0, page: 1, pageSize: 100 }),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+  await page.route('**/api/v1/orders**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ orders: [], total: 0, page: 1, pageSize: 20 }),
+      });
+      return;
+    }
+
+    await route.continue();
   });
 });
 

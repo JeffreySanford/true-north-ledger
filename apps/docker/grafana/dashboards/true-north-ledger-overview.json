@@ -1,0 +1,127 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "expr": "true_north_ledger_api_up", "legendFormat": "API up", "refId": "A" }],
+      "title": "API availability",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "expr": "true_north_ledger_api_uptime_seconds", "legendFormat": "API uptime", "refId": "A" }],
+      "title": "API uptime",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "expr": "true_north_ledger_database_up", "legendFormat": "Database up", "refId": "A" }],
+      "title": "Database availability",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "expr": "true_north_ledger_websocket_connections_active", "legendFormat": "WebSocket connections", "refId": "A" }],
+      "title": "WebSocket connections",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 6 },
+      "id": 5,
+      "targets": [{ "expr": "true_north_ledger_redis_configured", "legendFormat": "Redis configured", "refId": "A" }],
+      "title": "Redis configuration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 6 },
+      "id": 6,
+      "targets": [{ "expr": "true_north_ledger_websocket_connections_active", "legendFormat": "Active connections", "refId": "A" }],
+      "title": "WebSocket connection trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+      "id": 7,
+      "targets": [{ "expr": "sum(rate(true_north_ledger_http_requests_total[5m])) by (method, route, status_code)", "legendFormat": "{{method}} {{route}} {{status_code}}", "refId": "A" }],
+      "title": "HTTP request rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+      "id": 8,
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(true_north_ledger_http_request_duration_seconds_bucket[5m])) by (le, route))", "legendFormat": "{{route}} p95", "refId": "A" }],
+      "title": "HTTP p95 duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
+      "id": 9,
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(true_north_ledger_database_query_duration_seconds_bucket[5m])) by (le, operation))", "legendFormat": "{{operation}} p95", "refId": "A" }],
+      "title": "Database query p95 duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "eps" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 20 },
+      "id": 10,
+      "targets": [{ "expr": "sum(rate(true_north_ledger_ledger_events_created_total[5m])) by (event_type, subject_type, result)", "legendFormat": "{{event_type}} {{subject_type}} {{result}}", "refId": "A" }],
+      "title": "Ledger event creation rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "eps" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 27 },
+      "id": 11,
+      "targets": [{ "expr": "sum(rate(true_north_ledger_device_heartbeats_total[5m])) by (device_type, heartbeat_status, device_status)", "legendFormat": "{{device_type}} {{heartbeat_status}} {{device_status}}", "refId": "A" }],
+      "title": "Device heartbeat rate",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": ["true-north-ledger", "production"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "True North Ledger Production Overview",
+  "uid": "true-north-ledger-production",
+  "version": 1,
+  "weekStart": ""
+}

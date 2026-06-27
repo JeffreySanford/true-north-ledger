@@ -55,3 +55,6 @@ __screenshots__/
 .env.local
 .env.*.local
 !.env.example
+
+# Local TLS material
+apps/docker/nginx/certs/*.pem

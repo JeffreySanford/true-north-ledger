@@ -3,6 +3,7 @@ import { DevicesService } from './devices.service';
 import { DeviceEntity } from './device.entity';
 import type { LedgerEventsService } from '../ledger-events/ledger-events.service';
 import type { InventoryService } from '../inventory/inventory.service';
+import type { MetricsService } from '../config/metrics.service';
 
 const tenantId = '00000000-0000-0000-0000-000000000000';
 const now = new Date('2026-06-04T12:00:00.000Z');
@@ -45,6 +46,7 @@ describe('DevicesService', () => {
   };
   let ledgerEventsService: Pick<LedgerEventsService, 'appendEvent'>;
   let inventoryService: Pick<InventoryService, 'scanItem'>;
+  let metricsService: Pick<MetricsService, 'recordDeviceHeartbeat'>;
 
   beforeEach(() => {
     savedDevices = [];
@@ -81,12 +83,16 @@ describe('DevicesService', () => {
     inventoryService = {
       scanItem: jest.fn(() => of({ id: 'inventory-1' })),
     } as unknown as Pick<InventoryService, 'scanItem'>;
+    metricsService = {
+      recordDeviceHeartbeat: jest.fn(),
+    } as unknown as Pick<MetricsService, 'recordDeviceHeartbeat'>;
 
     service = new DevicesService(
       repository as never,
       nonceRepository as never,
       ledgerEventsService as LedgerEventsService,
       inventoryService as InventoryService,
+      metricsService as MetricsService,
     );
   });
 
@@ -261,6 +267,11 @@ describe('DevicesService', () => {
       next: (heartbeat) => {
         expect(heartbeat.deviceId).toBe(entity.id);
         expect(heartbeat.lastSeenAt).toBeTruthy();
+        expect(metricsService.recordDeviceHeartbeat).toHaveBeenCalledWith({
+          deviceType: 'scanner',
+          heartbeatStatus: 'online',
+          deviceStatus: 'active',
+        });
         expect(ledgerEventsService.appendEvent).toHaveBeenCalledWith(
           expect.objectContaining({
             payload: expect.objectContaining({ action: 'DEVICE_HEARTBEAT', metrics: { battery: 97 } }),
@@ -295,6 +306,11 @@ describe('DevicesService', () => {
       .subscribe({
         next: (heartbeat) => {
           expect(heartbeat.deviceId).toBe(entity.id);
+          expect(metricsService.recordDeviceHeartbeat).toHaveBeenCalledWith({
+            deviceType: 'scanner',
+            heartbeatStatus: 'online',
+            deviceStatus: 'active',
+          });
           expect(ledgerEventsService.appendEvent).toHaveBeenCalledWith(
             expect.objectContaining({
               payload: expect.objectContaining({ action: 'DEVICE_HEARTBEAT', metrics: { battery: 88 } }),

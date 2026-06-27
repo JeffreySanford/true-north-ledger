@@ -1,0 +1,39 @@
+groups:
+  - name: true-north-ledger.rules
+    interval: 15s
+    rules:
+      - alert: TrueNorthLedgerApiDown
+        expr: true_north_ledger_api_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: True North Ledger API is down
+          description: The API process did not report an up metric for at least one minute.
+
+      - alert: TrueNorthLedgerDatabaseUnavailable
+        expr: true_north_ledger_database_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: True North Ledger database is unavailable
+          description: Database readiness checks are failing.
+
+      - alert: TrueNorthLedgerWebSocketConnectionsDropped
+        expr: true_north_ledger_websocket_connections_active == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: No active WebSocket clients
+          description: No connected WebSocket clients have been observed for ten minutes.
+
+      - alert: TrueNorthLedgerHighApiUptimeResetRate
+        expr: changes(true_north_ledger_api_uptime_seconds[15m]) > 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: API process appears to be restarting frequently
+          description: API uptime changed more than three times in fifteen minutes.

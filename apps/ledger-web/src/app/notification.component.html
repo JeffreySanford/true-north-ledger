@@ -1,0 +1,117 @@
+@if (connectionState(); as state) {
+  <section class="notification-center" data-testid="notification-center">
+    <button
+      type="button"
+      class="notification-center__trigger"
+      data-testid="notification-trigger"
+      [attr.aria-expanded]="panelOpen()"
+      aria-controls="notification-panel"
+      (click)="togglePanel()"
+    >
+      <span class="material-icons" aria-hidden="true">notifications</span>
+      <span>Notifications</span>
+      @if (unreadCount() > 0) {
+        <span
+          class="notification-center__badge"
+          data-testid="notification-badge"
+          [attr.aria-label]="unreadCount() + ' unread notifications'"
+          [@statusPulse]="{ value: 'active', params: motionTimings }"
+        >
+          {{ unreadCount() }}
+        </span>
+      }
+    </button>
+    <span
+      class="notification-center__state"
+      data-testid="notification-state"
+      [class.notification-center__state--connected]="state === 'connected'"
+      [class.notification-center__state--connecting]="state === 'connecting' || state === 'reconnecting'"
+      [class.notification-center__state--disconnected]="state === 'disconnected' || state === 'failed'"
+    >
+      {{ connectionLabel(state) }}
+    </span>
+    <button
+      type="button"
+      class="notification-center__sound"
+      data-testid="notification-sound-toggle"
+      [attr.aria-label]="soundEnabled() ? 'Disable notification sound' : 'Enable notification sound'"
+      [attr.aria-pressed]="soundEnabled()"
+      (click)="toggleSound()"
+    >
+      <span class="material-icons" aria-hidden="true">{{ soundEnabled() ? 'volume_up' : 'volume_off' }}</span>
+    </button>
+    @if (state === 'failed' || state === 'disconnected') {
+      <button
+        type="button"
+        class="notification-center__retry"
+        data-testid="notification-retry"
+        (click)="retryConnection()"
+      >
+        Retry
+      </button>
+    }
+
+    @if (notifications()[0]; as latest) {
+      <aside
+        class="notification-toast"
+        [class.notification-toast--success]="toastTone(latest.notification) === 'success'"
+        [class.notification-toast--warning]="toastTone(latest.notification) === 'warning'"
+        [class.notification-toast--error]="toastTone(latest.notification) === 'error'"
+        data-testid="notification-toast"
+        [attr.data-tone]="toastTone(latest.notification)"
+        [attr.role]="toastTone(latest.notification) === 'error' ? 'alert' : 'status'"
+        aria-live="polite"
+        [@eventHighlight]="{ value: latest.id, params: motionTimings }"
+      >
+        <span class="material-icons" aria-hidden="true">{{ severityIcon(latest.notification) }}</span>
+        <span>{{ notificationTitle(latest.notification) }}: {{ notificationSubject(latest.notification) }}</span>
+        <button type="button" (click)="markAsRead(latest.id)">Mark read</button>
+      </aside>
+    }
+
+    @if (panelOpen()) {
+      <section
+        id="notification-panel"
+        class="notification-panel"
+        data-testid="notification-panel"
+        [@expandCollapse]="{ value: 'expanded', params: motionTimings }"
+      >
+        <header class="notification-panel__header">
+          <h2>Notification center</h2>
+          <button type="button" (click)="clearAll()" [disabled]="notifications().length === 0">Clear all</button>
+        </header>
+        @if (recentNotifications().length > 0) {
+          <ol class="notification-list">
+            @for (item of recentNotifications(); track trackById($index, item)) {
+              <li
+                data-testid="notification-list-item"
+                [class.notification-list__item--unread]="!item.read"
+                [@eventHighlight]="{ value: item.id, params: motionTimings }"
+              >
+                <span
+                  class="material-icons notification-list__icon"
+                  data-testid="notification-severity-icon"
+                  aria-hidden="true"
+                >
+                  {{ severityIcon(item.notification) }}
+                </span>
+                <div>
+                  <strong>{{ notificationTitle(item.notification) }}</strong>
+                  <p>{{ notificationSubject(item.notification) }}</p>
+                  <time [attr.datetime]="item.notification.occurredAt">{{ item.notification.occurredAt }}</time>
+                </div>
+                <button type="button" (click)="markAsRead(item.id)" [disabled]="item.read">Mark read</button>
+              </li>
+            }
+          </ol>
+        } @else {
+          <tnl-empty-state
+            icon="notifications"
+            title="No notifications"
+            message="Live tenant notifications will appear here."
+          />
+        }
+      </section>
+    }
+  </section>
+}

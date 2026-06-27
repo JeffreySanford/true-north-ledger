@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LedgerEventResponseSchema } from '@true-north-ledger/ledger-contracts';
 
 export * from '@true-north-ledger/ledger-contracts';
 export {
@@ -234,3 +235,102 @@ export const ServiceTokenSchema = z.object({
 });
 
 export type ServiceToken = z.infer<typeof ServiceTokenSchema>;
+
+export const NotificationPrioritySchema = z.enum(['high', 'normal', 'low']);
+export const NotificationCategorySchema = z.enum([
+	'ledger',
+	'order',
+	'inventory',
+	'device',
+	'anomaly',
+	'system',
+]);
+export const NotificationEventTypeSchema = z.enum([
+	'LEDGER_EVENT_CREATED',
+	'ORDER_STATUS_CHANGED',
+	'INVENTORY_LOW_STOCK',
+	'DEVICE_HEARTBEAT_MISSED',
+	'ANOMALY_DETECTED',
+	'SYSTEM_ALERT',
+]);
+
+const BaseNotificationSchema = z.object({
+	event: NotificationEventTypeSchema,
+	priority: NotificationPrioritySchema,
+	category: NotificationCategorySchema,
+	occurredAt: z.string().datetime(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const LedgerNotificationSchema = BaseNotificationSchema.extend({
+	event: z.literal('LEDGER_EVENT_CREATED'),
+	category: z.literal('ledger'),
+	ledgerEvent: LedgerEventResponseSchema,
+});
+
+export const OrderStatusNotificationSchema = BaseNotificationSchema.extend({
+	event: z.literal('ORDER_STATUS_CHANGED'),
+	category: z.literal('order'),
+	orderId: z.string().min(1),
+	orderNumber: z.string().min(1).optional(),
+	status: z.string().min(1),
+	previousStatus: z.string().min(1).optional(),
+	reason: z.string().min(1).optional(),
+});
+
+export const InventoryLowStockNotificationSchema = BaseNotificationSchema.extend({
+	event: z.literal('INVENTORY_LOW_STOCK'),
+	category: z.literal('inventory'),
+	itemId: z.string().min(1),
+	sku: z.string().min(1),
+	quantity: z.number().nonnegative(),
+	threshold: z.number().nonnegative(),
+	locationId: z.string().min(1).optional(),
+});
+
+export const DeviceHeartbeatMissedNotificationSchema = BaseNotificationSchema.extend({
+	event: z.literal('DEVICE_HEARTBEAT_MISSED'),
+	category: z.literal('device'),
+	deviceId: z.string().min(1),
+	lastHeartbeatAt: z.string().datetime().optional(),
+	missedSince: z.string().datetime(),
+});
+
+export const AnomalyDetectedNotificationSchema = BaseNotificationSchema.extend({
+	event: z.literal('ANOMALY_DETECTED'),
+	category: z.literal('anomaly'),
+	anomalyId: z.string().min(1),
+	anomalyType: z.string().min(1),
+	severity: z.string().min(1),
+	message: z.string().min(1),
+	subjectType: z.string().min(1).optional(),
+	subjectId: z.string().min(1).optional(),
+});
+
+export const SystemAlertNotificationSchema = BaseNotificationSchema.extend({
+	event: z.literal('SYSTEM_ALERT'),
+	category: z.literal('system'),
+	code: z.string().min(1),
+	message: z.string().min(1),
+	service: z.string().min(1).optional(),
+});
+
+export const AppNotificationSchema = z.discriminatedUnion('event', [
+	LedgerNotificationSchema,
+	OrderStatusNotificationSchema,
+	InventoryLowStockNotificationSchema,
+	DeviceHeartbeatMissedNotificationSchema,
+	AnomalyDetectedNotificationSchema,
+	SystemAlertNotificationSchema,
+]);
+
+export type NotificationPriority = z.infer<typeof NotificationPrioritySchema>;
+export type NotificationCategory = z.infer<typeof NotificationCategorySchema>;
+export type NotificationEventType = z.infer<typeof NotificationEventTypeSchema>;
+export type LedgerNotification = z.infer<typeof LedgerNotificationSchema>;
+export type OrderStatusNotification = z.infer<typeof OrderStatusNotificationSchema>;
+export type InventoryLowStockNotification = z.infer<typeof InventoryLowStockNotificationSchema>;
+export type DeviceHeartbeatMissedNotification = z.infer<typeof DeviceHeartbeatMissedNotificationSchema>;
+export type AnomalyDetectedNotification = z.infer<typeof AnomalyDetectedNotificationSchema>;
+export type SystemAlertNotification = z.infer<typeof SystemAlertNotificationSchema>;
+export type AppNotification = z.infer<typeof AppNotificationSchema>;

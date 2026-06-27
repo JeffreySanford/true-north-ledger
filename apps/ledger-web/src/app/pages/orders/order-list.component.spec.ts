@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { BehaviorSubject, of, Subject } from 'rxjs';
 import { vi } from 'vitest';
-import type { Order, OrderSummary } from '@true-north-ledger/order-contracts';
+import type { Order, OrderRealtimeEvent, OrderSummary } from '@true-north-ledger/order-contracts';
 import { OrdersService } from '../../orders.service';
 import { OrderRealtimeService } from '../../order-realtime.service';
 import { OrderListComponent } from './order-list.component';
@@ -110,11 +110,39 @@ describe('OrderListComponent', () => {
     expect(root.querySelector('[data-testid="order-realtime-state"]')?.textContent).toContain('connected');
   });
 
-  it('refreshes the active page when a real-time order event arrives', () => {
-    realtimeEvents.next({});
+  it('refreshes the active page when a real-time order creation event arrives', () => {
+    realtimeEvents.next({
+      type: 'created',
+      order: buildOrder(),
+      occurredAt: now,
+    } satisfies OrderRealtimeEvent);
 
     expect(listOrdersMock).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 5 }));
     expect(listOrdersMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('updates the visible order status when a real-time status change arrives', async () => {
+    await fixture.whenStable();
+    const updatedAt = '2026-06-05T12:01:00.000Z';
+
+    realtimeEvents.next({
+      type: 'status_changed',
+      order: buildOrder({
+        status: 'confirmed',
+        confirmedAt: updatedAt,
+        updatedAt,
+      }),
+      occurredAt: updatedAt,
+    } satisfies OrderRealtimeEvent);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(listOrdersMock).toHaveBeenCalledTimes(1);
+    expect(component.orders[0]?.status).toBe('confirmed');
+    expect(root.querySelector('[data-testid="order-card"] [data-testid="order-status-icon"]')?.getAttribute('aria-label')).toBe('Order status: confirmed');
+    expect(root.querySelector('.summary-tile__label')?.textContent).toContain('pending');
+    expect(component.countByStatus('pending')).toBe(0);
+    expect(component.countByStatus('confirmed')).toBe(1);
   });
 
   it('disconnects real-time updates when destroyed', () => {

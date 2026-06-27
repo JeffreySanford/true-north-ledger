@@ -15,7 +15,14 @@
 }
 
 .event-list li {
+  border-left: 3px solid transparent;
   margin: 0.75rem 0;
+  padding-left: 0.75rem;
+}
+
+.event-list li.ledger-event-row--live {
+  border-left-color: #0e5f93;
+  background: rgba(14, 95, 147, 0.08);
 }
 
 .event-context {

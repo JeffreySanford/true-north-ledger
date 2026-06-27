@@ -4,6 +4,7 @@ import { DeviceHardwareExamples } from '@true-north-ledger/shared-models';
 import type { Device, DeviceRegistrationResponse, LedgerEventResponse } from '@true-north-ledger/shared-models';
 
 const tenantId = '00000000-0000-0000-0000-000000000000';
+const socketBaseUrl = (process.env.API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
 function buildDevice(overrides: Partial<Device> = {}): Device {
   const now = new Date('2026-06-04T12:00:00.000Z').toISOString();
@@ -82,8 +83,9 @@ function buildLedgerEvent(
 }
 
 async function seedDeviceSession(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+  await page.addInitScript((apiUrl) => {
     window.localStorage.setItem('tnl.disableAutoAuth', 'true');
+    window.localStorage.setItem('tnl.socketBaseUrl', apiUrl);
     window.localStorage.setItem('tnl.authToken', 'device-admin-token');
     window.localStorage.setItem(
       'tnl.authUser',
@@ -95,7 +97,7 @@ async function seedDeviceSession(page: Page): Promise<void> {
         permissions: ['devices.read', 'devices.manage', 'ledger.read'],
       }),
     );
-  });
+  }, socketBaseUrl);
 }
 
 test.beforeEach(async ({ page }) => {

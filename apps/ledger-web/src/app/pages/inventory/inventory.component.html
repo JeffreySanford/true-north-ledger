@@ -2,6 +2,12 @@
   <div>
     <h1 class="page-heading">Inventory</h1>
     <p>Tenant-scoped stock records with ledger-backed provenance.</p>
+    <p data-testid="inventory-live-scan-status">
+      {{ liveScanCount }} live inventory scan{{ liveScanCount === 1 ? '' : 's' }} received this session.
+      @if (lastLiveScanSubjectId) {
+        <span>Last scanned item: {{ lastLiveScanSubjectId }}</span>
+      }
+    </p>
   </div>
   <tnl-trust-seal label="Inventory ledger" [state]="items.length ? 'verified' : 'pending'"></tnl-trust-seal>
 </section>

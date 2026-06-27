@@ -99,7 +99,7 @@ The repository contains a credible early platform foundation with:
 - Shared MD3/SCSS UX primitives for status chips, trust seals, mission cards, timelines, proof cards, connection state, empty/error states, and accessible animations.
 - Sprint 4.5 cross-sprint hardening for permission states, responsive layouts, reduced-motion behavior, visual primitive selectors, audit metadata consistency, tenant isolation, and retry/idempotency paths.
 
-Sprint 5 remains planned for WebSocket notifications, external notification transports, live operations UI, and production infrastructure hardening.
+Sprint 5 is open with health/readiness/metrics endpoints and order realtime WebSocket lifecycle hardening started. Generic WebSocket notifications, external notification transports, live operations UI, and production infrastructure hardening remain in progress.
 
 ## Experience Direction
 

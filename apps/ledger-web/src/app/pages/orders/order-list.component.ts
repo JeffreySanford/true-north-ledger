@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormBuilder } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
-import type { OrderSearchRequest, OrderStatus, OrderSummary } from '@true-north-ledger/order-contracts';
+import type { Order, OrderRealtimeEvent, OrderSearchRequest, OrderStatus, OrderSummary } from '@true-north-ledger/order-contracts';
 import { OrdersService } from '../../orders.service';
 import { OrderRealtimeService } from '../../order-realtime.service';
 import type { StatusChipTone } from '../../shared/status-chip/status-chip.component';
@@ -41,7 +41,7 @@ export class OrderListComponent implements OnInit, OnDestroy {
     this.orderRealtime.connect();
     this.orderRealtime.events$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => this.loadOrders(this.page));
+      .subscribe((event) => this.handleRealtimeEvent(event));
     this.loadOrders(1);
   }
 
@@ -166,6 +166,55 @@ export class OrderListComponent implements OnInit, OnDestroy {
           this.changeDetectorRef.detectChanges();
         },
       });
+  }
+
+  private handleRealtimeEvent(event: OrderRealtimeEvent): void {
+    if (event.type === 'status_changed' || event.type === 'cancelled') {
+      this.applyRealtimeOrder(event.order);
+      return;
+    }
+
+    this.loadOrders(this.page);
+  }
+
+  private applyRealtimeOrder(order: Order): void {
+    const summary = this.toOrderSummary(order);
+    const statusFilter = this.filtersForm.controls.status.value;
+    const existingIndex = this.orders.findIndex((current) => current.id === summary.id);
+    const matchesStatusFilter = !statusFilter || summary.status === statusFilter;
+
+    if (existingIndex >= 0 && matchesStatusFilter) {
+      this.orders = this.orders.map((current) => current.id === summary.id ? summary : current);
+    } else if (existingIndex >= 0) {
+      this.orders = this.orders.filter((current) => current.id !== summary.id);
+      this.totalOrders = Math.max(0, this.totalOrders - 1);
+    } else if (matchesStatusFilter) {
+      this.orders = [summary, ...this.orders].slice(0, this.pageSize);
+      this.totalOrders += 1;
+    }
+
+    this.changeDetectorRef.detectChanges();
+  }
+
+  private toOrderSummary(order: Order): OrderSummary {
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      tenantId: order.tenantId,
+      customerId: order.customerId,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      status: order.status,
+      totalAmount: order.totalAmount,
+      currency: order.currency,
+      correlationId: order.correlationId,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      confirmedAt: order.confirmedAt,
+      shippedAt: order.shippedAt,
+      deliveredAt: order.deliveredAt,
+      cancelledAt: order.cancelledAt,
+    };
   }
 
   private activeFilters(): {

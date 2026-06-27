@@ -1,15 +1,20 @@
 import {
   AuthErrorSchema,
+  AnomalyDetectedNotificationSchema,
+  AppNotificationSchema,
   CreateOrderRequestExample,
   CreateOrderRequestSchema,
+  DeviceHeartbeatMissedNotificationSchema,
   DeviceEventRequestSchema,
   DeviceHardwareExamples,
   DeviceRegistrationRequestSchema,
   DeviceTypeSchema,
+  InventoryLowStockNotificationSchema,
   CreateInventoryItemRequestExample,
   CreateInventoryItemRequestSchema,
   InventoryItemExample,
   InventoryItemSchema,
+  LedgerNotificationSchema,
   InventoryAnomalyListRequestSchema,
   InventoryAlertListResponseSchema,
   InventoryAnomalyListResponseSchema,
@@ -32,6 +37,7 @@ import {
   OrderExample,
   OrderLedgerEventActionSchema,
   OrderSchema,
+  OrderStatusNotificationSchema,
   OrderStatusSchema,
   OrderStatusUpdateRequestSchema,
   OrderTimelineEventSchema,
@@ -39,6 +45,7 @@ import {
   RateLimitErrorSchema,
   RoleSchema,
   ServiceTokenSchema,
+  SystemAlertNotificationSchema,
   UserSchema,
 } from './shared-models';
 
@@ -119,6 +126,113 @@ describe('shared-models', () => {
 
   it('rejects invalid permission dot-case values', () => {
     expect(() => PermissionSchema.parse('Ledger.Read')).toThrow();
+  });
+
+  it('validates all Sprint 5 notification event schemas through the shared union', () => {
+    const occurredAt = '2026-06-25T12:00:00.000Z';
+    const ledgerEvent = {
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      type: 'LEDGER_EVENT',
+      actorType: 'user',
+      actorId: 'admin',
+      subjectType: 'order',
+      subjectId: 'order-1',
+      payload: { action: 'created' },
+      metadata: {
+        tenantId: '00000000-0000-4000-8000-000000000000',
+        requestId: 'request-1',
+        correlationId: 'correlation-1',
+        payloadHash: 'a'.repeat(64),
+        eventHash: 'b'.repeat(64),
+        chainSequence: 1,
+        result: 'accepted',
+        timestamp: occurredAt,
+      },
+      createdAt: occurredAt,
+    };
+    const notifications = [
+      LedgerNotificationSchema.parse({
+        event: 'LEDGER_EVENT_CREATED',
+        priority: 'high',
+        category: 'ledger',
+        ledgerEvent,
+        occurredAt,
+      }),
+      OrderStatusNotificationSchema.parse({
+        event: 'ORDER_STATUS_CHANGED',
+        priority: 'high',
+        category: 'order',
+        orderId: 'order-1',
+        orderNumber: 'ORD-20260625-0001',
+        status: 'confirmed',
+        previousStatus: 'pending',
+        reason: 'Customer approved',
+        occurredAt,
+      }),
+      InventoryLowStockNotificationSchema.parse({
+        event: 'INVENTORY_LOW_STOCK',
+        priority: 'high',
+        category: 'inventory',
+        itemId: 'item-1',
+        sku: 'SKU-100',
+        quantity: 2,
+        threshold: 5,
+        locationId: 'AUSTIN-A1',
+        occurredAt,
+      }),
+      DeviceHeartbeatMissedNotificationSchema.parse({
+        event: 'DEVICE_HEARTBEAT_MISSED',
+        priority: 'normal',
+        category: 'device',
+        deviceId: 'device-1',
+        lastHeartbeatAt: '2026-06-25T11:55:00.000Z',
+        missedSince: occurredAt,
+        occurredAt,
+      }),
+      AnomalyDetectedNotificationSchema.parse({
+        event: 'ANOMALY_DETECTED',
+        priority: 'high',
+        category: 'anomaly',
+        anomalyId: 'anomaly-1',
+        anomalyType: 'quantity_discrepancy',
+        severity: 'critical',
+        message: 'Quantity mismatch detected.',
+        subjectType: 'inventory',
+        subjectId: 'item-1',
+        occurredAt,
+      }),
+      SystemAlertNotificationSchema.parse({
+        event: 'SYSTEM_ALERT',
+        priority: 'normal',
+        category: 'system',
+        code: 'API_DEGRADED',
+        message: 'API latency is above threshold.',
+        service: 'ledger-api',
+        occurredAt,
+      }),
+    ];
+
+    expect(notifications.map((notification) => AppNotificationSchema.parse(notification).event)).toEqual([
+      'LEDGER_EVENT_CREATED',
+      'ORDER_STATUS_CHANGED',
+      'INVENTORY_LOW_STOCK',
+      'DEVICE_HEARTBEAT_MISSED',
+      'ANOMALY_DETECTED',
+      'SYSTEM_ALERT',
+    ]);
+  });
+
+  it('rejects malformed Sprint 5 notification timestamps', () => {
+    expect(() =>
+      SystemAlertNotificationSchema.parse({
+        event: 'SYSTEM_ALERT',
+        priority: 'normal',
+        category: 'system',
+        code: 'API_DEGRADED',
+        message: 'API latency is above threshold.',
+        occurredAt: 'not-a-date',
+      }),
+    ).toThrow();
   });
 
   it('parses a valid user payload', () => {

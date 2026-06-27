@@ -42,6 +42,85 @@
     <tnl-severity-chip level="warning" message="Role setup incomplete" />
     <tnl-connection-status label="API" state="connected" detail="Development API readiness placeholder" />
   </div>
+  @if (notificationConnectionState$ | async; as notificationState) {
+    <section class="dashboard-live-operations" data-testid="live-operations-board">
+      <div class="dashboard-live-operations__header">
+        <h2>Live operations</h2>
+        <tnl-connection-status
+          label="Ledger feed"
+          [state]="connectionStateForPrimitive(notificationState)"
+          [detail]="notificationDetail(notificationState)"
+        />
+      </div>
+      <tnl-progress-rail
+        title="Readiness score"
+        [steps]="[
+          {
+            label: 'Socket connected',
+            state: notificationState === 'connected' ? 'complete' : 'pending'
+          },
+          {
+            label: 'Tenant subscription',
+            state: subscriptionRooms().length > 0 ? 'complete' : 'pending'
+          },
+          {
+            label: 'Recent ledger event',
+            state: recentNotifications().length > 0 ? 'complete' : 'pending'
+          }
+        ]"
+      />
+      <p data-testid="readiness-score">
+        {{ readinessScore(notificationState) }} readiness points from live API, WebSocket, and ledger inputs.
+      </p>
+      <p data-testid="live-event-count">
+        {{ liveEventCount() }} live ledger event{{ liveEventCount() === 1 ? '' : 's' }} received this session.
+      </p>
+      <div class="dashboard-live-operations__signals" data-testid="live-operations-signals">
+        <tnl-status-chip
+          label="Source"
+          [stateText]="liveOperationsSource(operationsSnapshot())"
+          [tone]="operationsSnapshot().source === 'api' ? 'success' : 'warning'"
+        />
+        <tnl-status-chip
+          label="Active sockets"
+          [stateText]="operationsSnapshot().activeConnections + ' active connections'"
+          [tone]="operationsSnapshot().activeConnections > 0 ? 'success' : 'neutral'"
+        />
+        <tnl-status-chip
+          label="Open anomalies"
+          [stateText]="operationsSnapshot().openAnomalies + ' open anomalies'"
+          [tone]="operationsSnapshot().openAnomalies > 0 ? 'warning' : 'success'"
+        />
+        <tnl-status-chip
+          label="Device heartbeat"
+          [stateText]="deviceHeartbeatLabel(operationsSnapshot())"
+          [tone]="operationsSnapshot().deviceHeartbeat.missing > 0 ? 'warning' : 'success'"
+        />
+      </div>
+      @if (recentNotifications().length > 0) {
+        <div class="dashboard-live-operations__feed" data-testid="live-event-feed">
+          @for (notification of recentNotifications(); track notification.ledgerEvent.id) {
+            <div [@eventHighlight]="{ value: notification.ledgerEvent.id, params: motionTimings }">
+              <tnl-ledger-event-card
+                [eventType]="notification.event"
+                [actor]="notification.ledgerEvent.actorType + ' / ' + notification.ledgerEvent.actorId"
+                [subject]="notification.ledgerEvent.subjectType + ' / ' + notification.ledgerEvent.subjectId"
+                [hash]="notification.ledgerEvent.metadata.eventHash"
+                [timestamp]="notification.occurredAt"
+                [result]="notification.ledgerEvent.metadata.result"
+              />
+            </div>
+          }
+        </div>
+      } @else {
+        <tnl-empty-state
+          icon="sync"
+          title="No live ledger events yet"
+          message="The live feed will show tenant ledger events after a durable server write."
+        />
+      }
+    </section>
+  }
   <p>
     Welcome to True North Ledger. This dashboard shell is the first step toward
     a contract-driven ledger platform with shared schema validation across UI,

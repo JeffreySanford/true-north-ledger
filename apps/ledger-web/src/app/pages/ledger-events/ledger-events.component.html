@@ -4,6 +4,9 @@
     <button class="button-primary" (click)="refresh()">Refresh events</button>
     <button class="button-secondary" (click)="createDemo()">Create demo event</button>
   </div>
+  <p data-testid="ledger-events-live-status">
+    Live ledger events are prepended as they arrive.
+  </p>
 
   @if (error) {
     <div class="section-card" data-testid="ledger-events-error">
@@ -20,7 +23,12 @@
   @if (!loading && events.length > 0) {
     <ul class="event-list" data-testid="ledger-events-list">
       @for (event of events; track event.id) {
-        <li data-testid="ledger-event-row">
+        <li
+          data-testid="ledger-event-row"
+          [attr.data-event-id]="event.id"
+          [attr.data-live-event]="isLiveEvent(event)"
+          [class.ledger-event-row--live]="isLiveEvent(event)"
+        >
           <strong>{{ event.payload['action'] ?? event.type }}</strong>
           <span class="event-context"> — {{ event.subjectType }} / {{ event.subjectId }}</span>
           <br />

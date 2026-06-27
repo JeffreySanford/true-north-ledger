@@ -1,0 +1,27 @@
+FROM node:22-alpine AS builder
+
+WORKDIR /workspace
+
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml nx.json tsconfig.base.json ./
+COPY apps ./apps
+COPY libs ./libs
+
+RUN pnpm install --frozen-lockfile
+RUN pnpm nx run ledger-api:build:production
+RUN pnpm nx run ledger-api:prune
+
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN corepack enable
+
+COPY --from=builder /workspace/dist/apps/ledger-api ./
+RUN pnpm install --prod --frozen-lockfile
+
+EXPOSE 3000
+
+CMD ["node", "main.js"]

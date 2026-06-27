@@ -40,6 +40,7 @@ import { InventoryScanRequestSchema } from '@true-north-ledger/inventory-contrac
 import { InventoryService } from '../inventory/inventory.service';
 import { DeviceEntity } from './device.entity';
 import { DeviceNonceEntity } from './device-nonce.entity';
+import { MetricsService } from '../config/metrics.service';
 
 export interface DeviceActor {
   userId: string;
@@ -77,6 +78,7 @@ export class DevicesService {
     private readonly ledgerEventsService: LedgerEventsService,
     @Inject(forwardRef(() => InventoryService))
     private readonly inventoryService: InventoryService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   registerDevice(
@@ -375,6 +377,11 @@ export class DevicesService {
     }
 
     const saved = await this.deviceRepository.save(entity);
+    this.metricsService.recordDeviceHeartbeat({
+      deviceType: saved.type,
+      heartbeatStatus: request.status ?? 'online',
+      deviceStatus: saved.status,
+    });
     this.appendDeviceAudit(DeviceLedgerEventAction.DEVICE_HEARTBEAT, saved, actor, requestContext, {
       heartbeatStatus: request.status ?? 'online',
       metrics: request.metrics ?? {},

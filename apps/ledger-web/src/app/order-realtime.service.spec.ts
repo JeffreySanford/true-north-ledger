@@ -8,10 +8,10 @@ import {
 } from './order-realtime.service';
 
 describe('OrderRealtimeService', () => {
-  const handlers = new Map<string, (value?: unknown) => void>();
+  const handlers = new Map<string, (...args: unknown[]) => void>();
   const disconnect = vi.fn();
   const socketFactory = vi.fn(() => ({
-    on: vi.fn((event: string, handler: (value?: unknown) => void) => {
+    on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
       handlers.set(event, handler);
       return undefined as never;
     }),
@@ -31,6 +31,7 @@ describe('OrderRealtimeService', () => {
   beforeEach(() => {
     handlers.clear();
     vi.clearAllMocks();
+    window.localStorage.removeItem('tnl.socketBaseUrl');
     TestBed.configureTestingModule({
       providers: [
         OrderRealtimeService,
@@ -64,6 +65,45 @@ describe('OrderRealtimeService', () => {
     );
     expect(states.at(-1)).toBe(true);
     expect(events).toHaveLength(1);
+  });
+
+  it('uses the configured socket base URL for browser-matrix runs', () => {
+    window.localStorage.setItem('tnl.socketBaseUrl', 'http://localhost:3000/');
+    const service = TestBed.inject(OrderRealtimeService);
+
+    service.connect();
+
+    expect(socketFactory).toHaveBeenCalledWith(
+      'http://localhost:3000/orders',
+      expect.objectContaining({
+        auth: { token: 'access-token' },
+      }),
+    );
+  });
+
+  it('acknowledges server heartbeat pings to keep the socket connected', () => {
+    const service = TestBed.inject(OrderRealtimeService);
+    const acknowledge = vi.fn();
+
+    service.connect();
+    handlers.get('heartbeat.ping')?.(
+      { timestamp: '2026-06-25T12:00:00.000Z' },
+      acknowledge,
+    );
+
+    expect(acknowledge).toHaveBeenCalledWith({
+      event: 'heartbeat.pong',
+      timestamp: expect.any(String),
+    });
+  });
+
+  it('disconnects the order socket during page lifecycle teardown', () => {
+    const service = TestBed.inject(OrderRealtimeService);
+
+    service.connect();
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(disconnect).toHaveBeenCalledTimes(1);
   });
 
   it('rejects malformed and cross-tenant events and disconnects cleanly', () => {

@@ -908,12 +908,13 @@ describe('InventoryService', () => {
   });
 
   it('lists filtered low-stock, expiring-soon, and anomaly alerts', async () => {
+    const expiringSoonDate = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
     repository.find.mockResolvedValue([
       buildEntity({ quantity: 2, metadata: { minimumQuantity: 5 } }),
       buildEntity({
         id: '66666666-6666-4666-8666-666666666666',
         sku: 'SKU-EXPIRING',
-        expirationDate: '2026-06-20',
+        expirationDate: expiringSoonDate,
       }),
       buildEntity({
         id: '77777777-7777-4777-8777-777777777777',

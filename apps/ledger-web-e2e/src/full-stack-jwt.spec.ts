@@ -4,6 +4,8 @@ import type { APIRequestContext } from '@playwright/test';
 import { createHmac, randomUUID } from 'crypto';
 import { DEVICE_EVENT_PAYLOAD_MAX_BYTES } from '@true-north-ledger/device-contracts';
 
+const socketBaseUrl = (process.env.API_URL ?? process.env.E2E_API_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+
 interface JwtPayload {
   sub: string;
   actorType: 'user';
@@ -95,9 +97,10 @@ async function login(
 
 test.describe('ledger-web full-stack JWT flow', () => {
   test.beforeEach(async ({ page, request }) => {
-    await page.addInitScript(() => {
+    await page.addInitScript((apiUrl) => {
       window.localStorage.setItem('tnl.disableAutoAuth', 'true');
-    });
+      window.localStorage.setItem('tnl.socketBaseUrl', apiUrl);
+    }, socketBaseUrl);
 
     await expect
       .poll(
@@ -142,10 +145,13 @@ test.describe('ledger-web full-stack JWT flow', () => {
     await expect(createButton).toBeVisible({ timeout: 15_000 });
     await createButton.click();
 
-    await expect(page.locator('[data-testid="ledger-event-row"]').filter({ hasText: actorId })).toBeVisible({ timeout: 15_000 });
+    const createdRows = () =>
+      page.locator('[data-testid="ledger-event-row"]').filter({ hasText: actorId });
+
+    await expect(createdRows().first()).toBeVisible({ timeout: 15_000 });
 
     await page.reload();
-    await expect(page.locator('[data-testid="ledger-event-row"]').filter({ hasText: actorId })).toBeVisible({ timeout: 15_000 });
+    await expect(createdRows().first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('redirects unauthenticated users to login when no JWT is available', async ({ page }) => {

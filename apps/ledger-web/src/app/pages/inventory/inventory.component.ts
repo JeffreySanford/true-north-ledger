@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, filter, switchMap, take, takeUntil } from 'rxjs';
 import type {
   CreateInventoryItemRequest,
   InventoryAlert,
@@ -20,6 +20,7 @@ import type {
   InventoryStatus,
 } from '@true-north-ledger/inventory-contracts';
 import { InventoryService } from '../../inventory.service';
+import { NotificationService } from '../../notification.service';
 import type { StatusChipTone } from '../../shared/status-chip/status-chip.component';
 import type { TimelineRailEntry } from '../../shared/timeline-rail/timeline-rail.component';
 
@@ -89,8 +90,11 @@ export class InventoryComponent implements OnInit, OnDestroy {
   cameraScanning = false;
   toastMessage: string | null = null;
   toastTone: 'success' | 'error' = 'success';
+  liveScanCount = 0;
+  lastLiveScanSubjectId: string | null = null;
 
   private readonly inventoryService = inject(InventoryService);
+  private readonly notificationService = inject(NotificationService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly destroy$ = new Subject<void>();
@@ -169,10 +173,13 @@ export class InventoryComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.refreshCameraScanAvailability();
+    this.connectLiveInventoryScans();
     this.load(1);
   }
 
   ngOnDestroy(): void {
+    this.notificationService.unsubscribe({ subjectType: 'inventory' }).subscribe();
+    this.notificationService.disconnect();
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -867,6 +874,32 @@ export class InventoryComponent implements OnInit, OnDestroy {
           this.loading = false;
           this.changeDetectorRef.detectChanges();
         },
+      });
+  }
+
+  private connectLiveInventoryScans(): void {
+    this.notificationService.connect();
+    this.notificationService.connectionState$
+      .pipe(
+        filter((state) => state === 'connected'),
+        take(1),
+        switchMap(() => this.notificationService.subscribe({ subjectType: 'inventory' })),
+        takeUntil(this.destroy$),
+      )
+      .subscribe();
+    this.notificationService.notifications$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((notification) => {
+        if (
+          notification.ledgerEvent.subjectType !== 'inventory' ||
+          notification.ledgerEvent.payload['action'] !== 'INVENTORY_SCANNED'
+        ) {
+          return;
+        }
+
+        this.liveScanCount += 1;
+        this.lastLiveScanSubjectId = notification.ledgerEvent.subjectId;
+        this.load(this.page);
       });
   }
 

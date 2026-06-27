@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
@@ -19,6 +20,8 @@ import {
   LedgerEventSchema,
 } from '@true-north-ledger/ledger-contracts';
 import { LedgerEventEntity } from './ledger-event.entity';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { MetricsService } from '../config/metrics.service';
 
 export interface AuthenticatedLedgerActor {
   userId: string;
@@ -37,6 +40,10 @@ export class LedgerEventsService {
   constructor(
     @InjectRepository(LedgerEventEntity)
     private readonly ledgerEventRepository: Repository<LedgerEventEntity>,
+    @Optional()
+    private readonly notificationsGateway?: NotificationsGateway,
+    @Optional()
+    private readonly metricsService?: MetricsService,
   ) {}
 
   findAll(tenantId: string): Observable<LedgerEventResponse[]> {
@@ -217,7 +224,16 @@ export class LedgerEventsService {
         : this.ledgerEventRepository.manager.transaction(appendWithManager);
 
       return from(savePromise).pipe(
-        map((savedEntity) => this.entityToResponse(savedEntity)),
+        map((savedEntity) => {
+          const response = this.entityToResponse(savedEntity);
+          this.metricsService?.recordLedgerEventCreated({
+            eventType: response.type,
+            subjectType: response.subjectType,
+            result: response.metadata.result,
+          });
+          this.notificationsGateway?.emitLedgerEvent(response);
+          return response;
+        }),
         catchError((error) => {
           if (process.env.NODE_ENV !== 'test') {
             console.error('Failed to append event', error);

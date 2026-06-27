@@ -26,6 +26,7 @@ import {
   ApiQuery,
   ApiTooManyRequestsResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import {
@@ -78,6 +79,7 @@ interface AuthenticatedRequest {
 
 @ApiTags('Orders')
 @ApiBearerAuth('jwt')
+@ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
 @Controller('v1/orders')
 @UseGuards(TokenAuthGuard, TenantGuard, PermissionsGuard)
 export class OrdersController {
@@ -387,6 +389,7 @@ export class OrdersController {
 
 @ApiTags('Proofs')
 @ApiBearerAuth('jwt')
+@ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
 @Controller('v1/proofs')
 @UseGuards(TokenAuthGuard, TenantGuard, PermissionsGuard)
 export class ProofsController {
@@ -396,6 +399,23 @@ export class ProofsController {
   @RequirePermissions('proof.read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify an order proof hash' })
+  @ApiBody({
+    description: 'Proof verification payload.',
+    schema: {
+      type: 'object',
+      required: ['proof'],
+      properties: {
+        proof: {
+          type: 'object',
+          required: ['orderId', 'proofHash'],
+          properties: {
+            orderId: { type: 'string', format: 'uuid' },
+            proofHash: { type: 'string', example: 'a'.repeat(64) },
+          },
+        },
+      },
+    },
+  })
   @ApiOkResponse({ description: 'Proof verification result returned.' })
   @ApiBadRequestResponse({ description: 'Proof payload validation failed.' })
   @ApiForbiddenResponse({ description: 'Caller lacks proof.read permission.' })

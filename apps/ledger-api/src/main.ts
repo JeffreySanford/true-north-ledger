@@ -5,33 +5,24 @@
 
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app/app.module';
-import { validateAuthEnv } from './app/config/auth-env.validation';
+import { openApiDtoModels } from './app/config/openapi-dto.models';
+import { createOpenApiConfig, openApiPath } from './app/config/openapi.config';
+import { validateRuntimeEnv } from './app/config/runtime-env.validation';
 
 async function bootstrap() {
-  validateAuthEnv();
+  validateRuntimeEnv();
 
   const app = await NestFactory.create(AppModule);
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
 
-  const swaggerPath = `${globalPrefix}/docs`;
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('True North Ledger API')
-    .setDescription('Audit, provenance, authentication, and ledger event API.')
-    .setVersion('0.1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'JWT access token for authenticated ledger actors.',
-      },
-      'jwt',
-    )
-    .build();
-  const openApiDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  const swaggerPath = openApiPath;
+  const swaggerConfig = createOpenApiConfig();
+  const openApiDocument = SwaggerModule.createDocument(app, swaggerConfig, {
+    extraModels: openApiDtoModels,
+  });
   SwaggerModule.setup(swaggerPath, app, openApiDocument, {
     swaggerOptions: {
       persistAuthorization: true,

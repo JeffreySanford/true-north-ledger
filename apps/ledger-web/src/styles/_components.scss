@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--tnl-space-4);
+  min-width: 0;
   min-height: var(--tnl-header-height);
   padding: var(--tnl-space-4) var(--tnl-space-6);
   background: var(--tnl-color-inverse-surface);
@@ -13,26 +14,31 @@
 }
 
 .app-shell .brand {
+  min-width: 0;
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 .app-shell nav {
   display: flex;
   flex-wrap: wrap;
   gap: var(--tnl-space-2);
+  min-width: 0;
 }
 
 .app-shell a {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   min-height: 2.5rem;
   padding: 0 var(--tnl-space-3);
   border-radius: var(--tnl-radius-md);
   color: color-mix(in srgb, var(--tnl-color-inverse-on-surface), transparent 18%);
   text-decoration: none;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .app-shell a.active,
@@ -127,6 +133,7 @@
   display: inline-flex;
   align-items: center;
   max-width: 100%;
+  min-width: 0;
   min-height: 2rem;
   gap: var(--tnl-space-2);
   border: var(--tnl-border-subtle);
@@ -1641,16 +1648,23 @@ tnl-order-proof {
 @media (max-width: 640px) {
   .app-shell {
     align-items: flex-start;
+    gap: var(--tnl-space-3);
     padding: var(--tnl-space-4);
   }
 
   .app-shell nav {
     width: 100%;
+    min-width: 0;
   }
 
   .app-shell a {
     flex: 1 1 auto;
     justify-content: center;
+  }
+
+  .app-shell a span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .app-body {
